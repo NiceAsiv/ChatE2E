@@ -1,6 +1,6 @@
 # ChatE2E - A End-to-end encrypted chat application
 
-这是一个端到端加密聊天应用程序，使用 PyQt 设计用户界面，提供安全的消息传递功能。
+这是一个端到端加密聊天应用程序，使用 PyQt6 设计用户界面，提供安全的消息传递功能。
 
 ## 特性
 
