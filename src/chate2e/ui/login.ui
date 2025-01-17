@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>QQ登录</string>
+   <string>端到端聊天登录</string>
   </property>
   <property name="styleSheet">
    <string notr="true">QMainWindow {
@@ -28,14 +28,13 @@
         <height>200</height>
        </size>
       </property>
-      <property name="styleSheet">
-       <string notr="true">QLabel {
-    background-image: url(background.jpg);
+   <property name="styleSheet">
+   <string notr="true">QLabel {
+    background-image: url(:/static/login_background.jpg);
     background-position: center;
     background-repeat: no-repeat;
-    background-size: cover;
-}</string>
-      </property>
+   }</string>
+</property>
      </widget>
     </item>
     <item>

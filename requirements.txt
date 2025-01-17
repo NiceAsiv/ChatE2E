@@ -1,2 +1,22 @@
-PyQt6
-cryptography
+cffi==1.17.1
+click==8.1.8
+colorama @ file:///C:/b/abs_a9ozq0l032/croot/colorama_1672387194846/work
+cryptography==44.0.0
+exceptiongroup @ file:///C:/b/abs_c5h1o1_b5b/croot/exceptiongroup_1706031441653/work
+iniconfig @ file:///home/linux1/recipes/ci/iniconfig_1610983019677/work
+packaging @ file:///C:/b/abs_c3vlh0z4jw/croot/packaging_1720101866539/work
+pluggy @ file:///C:/ci/pluggy_1648042776090/work
+pycparser==2.22
+PyQt5==5.15.11
+PyQt5-Qt5==5.15.2
+PyQt5_sip==12.15.0
+PyQt6==6.4.2
+pyqt6-plugins==6.4.2.2.3
+PyQt6-Qt6==6.4.3
+pyqt6-tools==6.4.2.3.3
+PyQt6_sip==13.8.0
+pytest @ file:///C:/b/abs_een_3z747j/croot/pytest_1717793253670/work
+python-dotenv==1.0.1
+qt6-applications==6.4.3.2.3
+qt6-tools==6.4.3.1.3
+tomli @ file:///C:/Windows/TEMP/abs_ac109f85-a7b3-4b4d-bcfd-52622eceddf0hy332ojo/croots/recipe/tomli_1657175513137/work
