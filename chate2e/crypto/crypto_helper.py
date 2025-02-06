@@ -141,3 +141,110 @@ class CryptoHelper:
             result |= a ^ b
         if result != 0:
             raise ValueError("Bad MAC")
+        
+        
+    def pad_pkcs7(self, data: bytes, block_size: int) -> bytes:
+        """
+        使用PKCS7填充数据。
+        :param data: 待填充数据
+        :param block_size: 块大小
+        :return: 填充后的数据
+        """
+        padding_length = block_size - (len(data) % block_size)
+        padding = bytes([padding_length] * padding_length)
+        return data + padding
+    
+    def unpad_pkcs7(self, padded_data: bytes) -> bytes:
+        """
+        使用PKCS7解除填充。
+        :param data: 待解除填充的数据
+        :return: 解除填充后的数据
+        """
+        padding_length = padded_data[-1]
+        if padding_length < 1 or padding_length > 16:
+            raise ValueError("Invalid padding")
+        for i in range(padding_length):
+            if padded_data[-(i+1)] != padding_length:
+                raise ValueError("Invalid padding")
+        return padded_data[:-padding_length]
+    
+    def hkdf(self, input_key: bytes, length: int, salt: bytes = None, info: bytes = None) -> bytes:
+        """
+        使用HKDF进行密钥派生。
+        :param input_key: 输入密钥
+        :param length: 派生密钥长度
+        :param salt: 盐
+        :param info: 附加信息
+        :return: 派生密钥
+        """
+        if salt is None:
+            salt = bytes([0] * 32)
+        if info is None:
+            info = b""
+            
+        hkdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=length,
+            salt=salt,
+            info=info,
+            backend=self.backend
+        )
+        return hkdf.derive(input_key)
+    
+    def constant_time_compare(self, a: bytes, b: bytes) -> bool:
+        """
+        比较两个字节串是否相等，使用常量时间。
+        :param a: 字节串1
+        :param b: 字节串2
+        :return: 是否相等
+        """
+        if len(a) != len(b):
+            return False
+        result = 0
+        for x, y in zip(a, b):
+            result |= x ^ y
+        return result == 0
+    
+    def encrypt_aes_gcm(self, key: bytes, data: bytes) -> tuple[bytes, bytes, bytes]:
+        """
+        使用AES-GCM进行认证加密
+        :param key: 密钥
+        :param data: 待加密数据
+        :return: 加密后的密文、认证标签和随机数
+        """
+        if len(key) not in (16, 24, 32):
+            raise ValueError("Invalid key length")
+            
+        nonce = self.get_random_bytes(12)
+        cipher = Cipher(algorithms.AES(key), modes.GCM(nonce), backend=self.backend)
+        encryptor = cipher.encryptor()
+        ciphertext = encryptor.update(data) + encryptor.finalize()
+        return ciphertext, encryptor.tag, nonce
+    
+    def decrypt_aes_gcm(self, key: bytes, data: bytes, tag: bytes, nonce: bytes) -> bytes:
+        """
+        使用AES-GCM进行认证解密
+        :param key: 密钥
+        :param data: 密文
+        :param tag: 认证标签
+        :param nonce: 随机数
+        :return: 解密后的明文
+        """
+        if len(key) not in (16, 24, 32):
+            raise ValueError("Invalid key length")
+        cipher = Cipher(algorithms.AES(key), modes.GCM(nonce, tag), backend=self.backend)
+        decryptor = cipher.decryptor()
+        return decryptor.update(data) + decryptor.finalize()
+    
+    def derive_key_pair(self, seed: bytes) -> tuple[bytes, bytes]:
+        """
+        从种子派生Ed25519密钥对。
+        :param seed: 种子
+        :return: Ed25519私钥和公钥
+        """
+        if len(seed) < 32:
+            raise ValueError("Seed too short")
+        priv = self.hkdf(seed, 32, info=b"key_derive")
+        priv_key = x25519.X25519PrivateKey.from_private_bytes(priv)
+        pub_key = priv_key.public_key()
+        return priv, pub_key.public_bytes()
