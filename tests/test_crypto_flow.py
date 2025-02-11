@@ -1,5 +1,5 @@
 import pytest
-from chate2e.core.crypto_helper import CryptoHelper
+from chate2e.crypto.crypto_helper import CryptoHelper
 from cryptography.hazmat.primitives import serialization
 
 @pytest.fixture

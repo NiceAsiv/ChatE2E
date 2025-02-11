@@ -1,13 +1,8 @@
 {
-    "python.testing.pytestEnabled": true,
-    "python.testing.unittestEnabled": false,
+    "makefile.configureOnOpen": false,
     "python.testing.pytestArgs": [
-        "tests",
-        "--rootdir=.",
-        "--import-mode=importlib"
+        "tests"
     ],
-    "python.analysis.extraPaths": [
-        "./chate2e"
-    ],
-    "makefile.configureOnOpen": false
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }

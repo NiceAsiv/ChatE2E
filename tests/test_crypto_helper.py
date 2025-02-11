@@ -1,7 +1,7 @@
 import pytest
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import x25519, ed25519
-from chate2e.core.crypto_helper import CryptoHelper
+from chate2e.crypto.crypto_helper import CryptoHelper
 
 @pytest.fixture
 def crypto_helper():
