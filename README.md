@@ -22,6 +22,10 @@
    ```bash
    pip install -r requirements.txt
    ```
+   conda版本
+   ```bash
+   conda env create -f conda_env.yml
+   ```
 
 ## 使用
 
