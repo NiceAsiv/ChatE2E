@@ -1,0 +1,36 @@
+{
+  "u001": {
+    "user_id": "u001",
+    "username": "Alice",
+    "avatar_path": "assets/avatars/alice.png",
+    "public_key": "alice_public_key",
+    "status": "online",
+    "last_seen": "",
+    "contacts": [
+      "u002",
+      "u003"
+    ]
+  },
+  "u002": {
+    "user_id": "u002",
+    "username": "Bob",
+    "avatar_path": "assets/avatars/bob.png",
+    "public_key": "bob_public_key",
+    "status": "offline",
+    "last_seen": "",
+    "contacts": [
+      "u001"
+    ]
+  },
+  "u003": {
+    "user_id": "u003",
+    "username": "Asiv",
+    "avatar_path": "",
+    "public_key": "asiv_public_key",
+    "status": "offline",
+    "last_seen": "",
+    "contacts": [
+      "u001"
+    ]
+  }
+}

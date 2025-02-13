@@ -1,24 +1,23 @@
 from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from cryptography.hazmat import serialization
+from cryptography.hazmat.primitives import serialization
 
-class HMACHelper:
-    def __init__(self):
-        self.backend = default_backend()
-
-    def sign(self, key: bytes, data: bytes) -> bytes:
+class MACHelper:
+    @staticmethod
+    def sign(data: bytes, key: bytes) -> bytes:
         """
         使用 HMAC-SHA256 进行签名，生成 MAC 值。
         :param key: 密钥字节
         :param data: 待签名数据
         :return: 生成的 MAC 值
         """
-        h = hmac.HMAC(key, hashes.SHA256(), backend=self.backend)
+        h = hmac.HMAC(key, hashes.SHA256(), backend=default_backend())
         h.update(data)
         return h.finalize()
-
-    def verify(self, data: bytes, key: bytes, mac: bytes, length: int) -> None:
+    
+    @staticmethod
+    def verify(key: bytes, data: bytes, mac: bytes, length: int) -> None:
         """
         验证 MAC 是否正确。
         :param data: 被验证的数据
@@ -27,14 +26,15 @@ class HMACHelper:
         :param length: MAC 长度
         :raises ValueError: 如果 MAC 校验失败
         """
-        calculated_mac = self.sign(key, data)
+        calculated_mac = MACHelper.sign(data, key)
         if len(mac) != length or len(calculated_mac) < length:
             raise ValueError("Bad MAC length")
 
-        if not self.constant_time_compare(calculated_mac[:length], mac):
+        if not MACHelper.constant_time_compare(calculated_mac[:length], mac):
             raise ValueError("Bad MAC")
-
-    def constant_time_compare(self, a: bytes, b: bytes) -> bool:
+    
+    @staticmethod
+    def constant_time_compare(a: bytes, b: bytes) -> bool:
         """
         使用常量时间比较两个字节串是否相等，防止时序攻击。
         :param a: 字节串1
@@ -48,7 +48,8 @@ class HMACHelper:
             result |= x ^ y
         return result == 0
     
-    def ed25519_sign(self, priv_key_bytes: bytes, message: bytes) -> bytes:
+    @staticmethod
+    def ed25519_sign(priv_key_bytes: bytes, message: bytes) -> bytes:
         """
         Ed25519签名。
         :param priv_key_bytes: 32字节的Ed25519私钥
@@ -57,8 +58,9 @@ class HMACHelper:
         """
         private_key = ed25519.Ed25519PrivateKey.from_private_bytes(priv_key_bytes)
         return private_key.sign(message)
-
-    def ed25519_verify(self, pub_key_bytes: bytes, msg: bytes, sig: bytes) -> bool:
+    
+    @staticmethod
+    def ed25519_verify(pub_key_bytes: bytes, msg: bytes, sig: bytes) -> bool:
         """
         Ed25519验签。
         :param pub_key_bytes: 32字节的Ed25519公钥
@@ -67,5 +69,8 @@ class HMACHelper:
         :return: 验证结果，True或抛出异常
         """
         public_key = ed25519.Ed25519PublicKey.from_public_bytes(pub_key_bytes)
-        public_key.verify(sig, msg)
-        return True
+        try:
+            public_key.verify(sig, msg)
+            return True
+        except Exception:
+            return False

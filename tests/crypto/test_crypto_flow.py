@@ -14,22 +14,16 @@ def test_e2e_encryption(crypto_helper):
     crypto = crypto_helper
 
     # 1. Alice 和 Bob 各自生成 X25519 密钥对
-    alice_priv = crypto.create_key_pair()
-    bob_priv = crypto.create_key_pair()
+    alice_priv, alice_pub = crypto.create_x25519_keypair()
+    bob_priv, bob_pub = crypto.create_x25519_keypair()
 
-    alice_pub = alice_priv.public_key().public_bytes(
-        serialization.Encoding.Raw,
-        serialization.PublicFormat.Raw
-    )
-    bob_pub = bob_priv.public_key().public_bytes(
-        serialization.Encoding.Raw,
-        serialization.PublicFormat.Raw
-    )
+    alice_pub_bytes = crypto.export_x25519_public_key(alice_priv)
+    bob_pub_bytes = crypto.export_x25519_public_key(bob_priv)
 
     # 2. Alice 使用 Bob 的公钥和自己的私钥生成共享密钥
-    shared_key_alice = crypto.ecdhe(bob_pub, alice_priv)
+    shared_key_alice = crypto.ecdh(alice_priv, bob_pub_bytes)
     # 3. Bob 使用 Alice 的公钥和自己的私钥生成共享密钥
-    shared_key_bob = crypto.ecdhe(alice_pub, bob_priv)
+    shared_key_bob = crypto.ecdh(bob_priv, alice_pub_bytes)
     
     assert shared_key_alice == shared_key_bob
 

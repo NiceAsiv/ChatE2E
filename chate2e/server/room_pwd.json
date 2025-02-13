@@ -1,0 +1,12 @@
+[
+    {
+      "roomId": "r001",
+      "pwd": "123456",
+      "turns": [{
+        "urls": [ "url" ],
+        "username": "turn",
+        "credential": "turn"
+      }],
+      "remark": "备注"
+    }
+  ]
