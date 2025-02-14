@@ -1,13 +1,11 @@
 from flask import Flask, request, jsonify
-from typing import NamedTuple, FrozenSet, Dict, Optional
-from base64 import b64encode, b64decode
+from typing import Dict, Optional
 from flask_cors import CORS
-from datetime import datetime
 import json
 from typing import List
 import uuid
 import os
-from message_manager import Message, MessageManager,SessionManager
+from message_manager import Message, MessageManager
 from chate2e.crypto.protocol.types import Bundle
 
 app = Flask(__name__)
@@ -71,7 +69,6 @@ class ChatServer:
     def __init__(self):
         self.users: Dict[str, User] = {}  # 用户ID -> 用户实例
         self.username_map: Dict[str, str] = {}  # username -> uuid
-        self.session_manager = SessionManager()
         self.message_manager = MessageManager()
         self._load_users()
 
@@ -120,6 +117,10 @@ class ChatServer:
             print(f"注册用户失败: {e}")
             return None
         
+    def is_user_registered(self, username: str) -> bool:
+        """检查用户是否已注册"""
+        return username in self.users
+         
     def get_user_bundle_by_useruuid(self, useruuid: str) -> Optional[dict]:
         """获取用户的密钥Bundle"""
         if useruuid not in self.users:
@@ -144,9 +145,6 @@ class ChatServer:
             encryption=encryption
         )
         
-        # 更新会话活动时间
-        self.session_manager.update_session_activity(session_id)
-        
         # 保存消息历史
         self.message_manager.add_message(message)
         
@@ -161,29 +159,63 @@ class ChatServer:
 chat_server = ChatServer()
 
 @app.route('/register', methods=['POST'])
-def register():
-    """注册新用户并上传其Bundle"""
+def register_user():
+    """注册新用户"""
     data = request.get_json()
     username = data.get('username')
-    key_bundle = data.get('key_bundle')
     
-    if not all([username, key_bundle]):
+    if not username:
         return jsonify({
             'status': 'error', 
-            'message': '缺少用户名或密钥Bundle'
+            'message': '缺少用户名'
         }), 400
-        
-    user_uuid = chat_server.register_user(username, key_bundle)
-    if user_uuid:
+
+    useruuid = generate_short_uuid()
+    user = User(username, useruuid)
+    chat_server.users[useruuid] = user
+    chat_server.username_map[username] = useruuid
+    chat_server._save_users()
+
+    return jsonify({
+        'status': 'success',
+        'message': '注册成功',
+        'uuid': useruuid
+    })
+
+@app.route('/register/bundle', methods=['PUT'])
+def upload_initial_bundle():
+    """上传用户初始Bundle"""
+    data = request.get_json()
+    user_uuid = data.get('uuid')
+    key_bundle = data.get('key_bundle')
+    
+    if not all([user_uuid, key_bundle]):
         return jsonify({
-            'status': 'success',
-            'message': '注册成功',
-            'uuid': user_uuid
-        })
-    else:
+            'status': 'error', 
+            'message': '缺少UUID或密钥Bundle'
+        }), 400
+
+    user = chat_server.get_user(user_uuid)
+    if not user:
         return jsonify({
             'status': 'error',
-            'message': '注册失败,用户名已存在'
+            'message': '用户不存在'
+        }), 404
+
+    try:
+        user.set_bundle(Bundle.from_dict(key_bundle))
+        user.is_online = True
+        chat_server._save_users()
+        return jsonify({
+            'status': 'success',
+            'message': '初始Bundle上传成功'
+        })
+        
+    except Exception as e:
+        print(f"上传初始Bundle失败: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Bundle上传失败'
         }), 400
 
 @app.route('/key_bundle/<user_uuid>', methods=['GET'])
@@ -283,33 +315,6 @@ def update_user_status():
         'message': '状态更新成功'
     })
     
-@app.route('/session', methods=['POST'])
-def create_session():
-    """创建新会话"""
-    data = request.get_json()
-    initiator_id = data.get('initiator_id')
-    recipient_id = data.get('recipient_id')
-    
-    if not all([initiator_id, recipient_id]):
-        return jsonify({
-            'status': 'error',
-            'message': '缺少必要参数'
-        }), 400
-    
-    session_id = chat_server.session_manager.create_session(initiator_id, recipient_id)
-    return jsonify({
-        'status': 'success',
-        'session_id': session_id
-    })
-
-@app.route('/session/<user_id>', methods=['GET'])
-def get_user_sessions(user_id):
-    """获取用户的所有会话"""
-    sessions = chat_server.session_manager.get_user_sessions(user_id)
-    return jsonify({
-        'status': 'success',
-        'sessions': sessions
-    })
 
 @app.route('/message', methods=['POST'])
 def handle_message():
@@ -317,29 +322,19 @@ def handle_message():
     data = request.get_json()
     sender_id = data.get('sender_id')
     receiver_id = data.get('receiver_id')
-    session_id = data.get('session_id')
     encrypted_content = data.get('encrypted_content')
     encryption = data.get('encryption')
     
-    if not all([sender_id, receiver_id, session_id, encrypted_content]):
+    if not all([sender_id, receiver_id, encrypted_content]):
         return jsonify({
             'status': 'error',
             'message': '缺少必要参数'
         }), 400
         
-    # 验证会话
-    session = chat_server.session_manager.get_session(session_id)
-    if not session:
-        return jsonify({
-            'status': 'error',
-            'message': '无效的会话ID'
-        }), 404
-        
     # 处理消息
     message = chat_server.handle_message(
         sender_id=sender_id,
         receiver_id=receiver_id,
-        session_id=session_id,
         encrypted_content=encrypted_content,
         encryption=encryption
     )
@@ -361,19 +356,6 @@ def get_offline_messages(user_id):
         'status': 'success',
         'messages': messages
     })
-
-@app.route('/messages/session/<session_id>', methods=['GET'])
-def get_session_messages(session_id):
-    """获取会话的消息历史"""
-    messages = [
-        msg.to_dict() 
-        for msg in chat_server.message_manager.get_session_messages(session_id)
-    ]
-    return jsonify({
-        'status': 'success',
-        'messages': messages
-    })
-    
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

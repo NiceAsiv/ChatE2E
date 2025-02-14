@@ -1,11 +1,19 @@
 import aiohttp
-import json
 from typing import Optional, Dict
 from chate2e.crypto.protocol.types import Bundle
+from chate2e.utils.message import Message
+import asyncio
+
 class ClientNetworkService:
     def __init__(self, base_url: str = "http://localhost:5000"):
         self.base_url = base_url
-        self.session = aiohttp.ClientSession()
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+        self.session = aiohttp.ClientSession(loop=self.loop)
+
 
     async def close(self):
         await self.session.close()
@@ -57,7 +65,7 @@ class ClientNetworkService:
             print(f"更新密钥bundle失败: {e}")
             return False
 
-    async def send_message(self, message_data: dict) -> bool:
+    async def send_message(self, message_data: Message) -> bool:
         """发送加密消息"""
         try:
             async with self.session.post(
