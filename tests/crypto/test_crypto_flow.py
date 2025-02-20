@@ -33,10 +33,11 @@ def test_e2e_encryption(crypto_helper):
 
     # 5. Alice 加密信息
     message = b"Hello, this is a secret message."
-    ciphertext = crypto.encrypt_aes_cbc(aes_key, message, iv)
-    print("Ciphertext:", ciphertext)
-
+    ciphertext, tag = crypto.encrypt_aes_gcm(aes_key, message, iv)
+    print("Ciphertext:", ciphertext.hex(), "Tag:", tag.hex())
+    
     # 6. Bob 解密信息
-    decrypted = crypto.decrypt_aes_cbc(aes_key, ciphertext, iv)
-    print("Decrypted:", decrypted)
+    decrypted = crypto.decrypt_aes_gcm(aes_key, ciphertext, iv, tag)
+    print("Decrypted:", decrypted.decode())
+    
     assert decrypted == message

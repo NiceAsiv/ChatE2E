@@ -27,9 +27,8 @@ def test_encrypt_decrypt_aes_gcm(crypto_helper):
     iv = crypto_helper.get_random_bytes(12)
     data = b"Test data for AES GCM mode"
     
-    encrypted_data = crypto_helper.encrypt_aes_gcm(key, data, iv)
-    tag = encrypted_data[-16:]
-    ciphertext = encrypted_data[:-16]
+    encrypted_data, tag = crypto_helper.encrypt_aes_gcm(key, data, iv)
+    ciphertext = encrypted_data
     
     decrypted_data = crypto_helper.decrypt_aes_gcm(key, ciphertext, iv, tag)
     

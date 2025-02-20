@@ -8,41 +8,13 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import padding
 from typing import Tuple, Optional
 
-
-def encrypt_aes_cbc(key: bytes, data: bytes, iv: bytes) -> bytes:
-    """
-    使用AES-CBC模式进行加密。
-    :param key: 原始密钥
-    :param data: 待加密数据
-    :param iv: 初始向量
-    :return: 加密结果
-    """
-    padder = padding.PKCS7(algorithms.AES.block_size).padder()
-    padded_data = padder.update(data) + padder.finalize()
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-    encryptor = cipher.encryptor()
-    return encryptor.update(padded_data) + encryptor.finalize()
-
-
-def export_ed25519_public_key(private_key: ed25519.Ed25519PrivateKey) -> bytes:
-    """
-    导出 Ed25519 公钥的原始字节表示。
-    :param private_key: Ed25519 私钥对象
-    :return: 公钥字节
-    """
-    public_key = private_key.public_key()
-    return public_key.public_bytes(
-        encoding=serialization.Encoding.Raw,
-        format=serialization.PublicFormat.Raw
-    )
-
-
 class CryptoHelper:
     """
     加密辅助类，AES加解密、SHA-512哈希、KDF
     """
     def __init__(self):
         self.backend = default_backend()
+        
     def get_random_bytes(self, size: int) -> bytes:
         """
         生成指定长度的随机字节。
@@ -51,6 +23,21 @@ class CryptoHelper:
         """
         return os.urandom(size)
 
+
+    def encrypt_aes_cbc(self,key: bytes, data: bytes, iv: bytes) -> bytes:
+        """
+        使用AES-CBC模式进行加密。
+        :param key: 原始密钥
+        :param data: 待加密数据
+        :param iv: 初始向量
+        :return: 加密结果
+        """
+        padder = padding.PKCS7(algorithms.AES.block_size).padder()
+        padded_data = padder.update(data) + padder.finalize()
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        return encryptor.update(padded_data) + encryptor.finalize()
+        
     def decrypt_aes_cbc(self, key: bytes, data: bytes, iv: bytes) -> bytes:
         """
         使用AES-CBC模式进行解密。
@@ -78,7 +65,7 @@ class CryptoHelper:
         cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
         encryptor = cipher.encryptor()
         ciphertext = encryptor.update(data) + encryptor.finalize()
-        return ciphertext + encryptor.tag
+        return ciphertext , encryptor.tag
     
     def decrypt_aes_gcm(self, key: bytes, data: bytes, iv: bytes, tag: Optional[bytes]) -> bytes:
         """
@@ -130,6 +117,18 @@ class CryptoHelper:
         """
         导出 X25519 公钥的原始字节表示。
         :param private_key: X25519 私钥对象
+        :return: 公钥字节
+        """
+        public_key = private_key.public_key()
+        return public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw
+        )
+        
+    def export_ed25519_public_key(self,private_key: ed25519.Ed25519PrivateKey) -> bytes:
+        """
+        导出 Ed25519 公钥的原始字节表示。
+        :param private_key: Ed25519 私钥对象
         :return: 公钥字节
         """
         public_key = private_key.public_key()

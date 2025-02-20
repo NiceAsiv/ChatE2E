@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from chate2e.crypto.crypto_helper import CryptoHelper
 from chate2e.crypto.mac_helper import MACHelper
 from chate2e.crypto.protocol.types import Bundle
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 from chate2e.utils.network_service import ClientNetworkService
 
 class X3DHProtocol:
