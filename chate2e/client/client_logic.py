@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt
 from chate2e.client.models import Message, DataManager, Friend
 from chate2e.crypto.protocol.x3dh import X3DHProtocol
 from chate2e.client.chat_ui import ChatWindowUI, ContactItem, ChatItem, DEFAULT_AVATAR_PATH
-from chate2e.utils.message import MessageType
+from chate2e.model.message import MessageType
 
 
 class ChatWindow(ChatWindowUI):

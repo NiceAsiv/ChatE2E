@@ -1,7 +1,7 @@
 import aiohttp
 from typing import Optional, Dict
 from chate2e.crypto.protocol.types import Bundle
-from chate2e.utils.message import Message
+from chate2e.model.message import Message
 import asyncio
 
 class ClientNetworkService:

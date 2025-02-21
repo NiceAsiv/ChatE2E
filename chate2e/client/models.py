@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import json
 import os
 import uuid
-from chate2e.utils.message import Message
+from chate2e.model.message import Message
 import enum
 
 class UserStatus(enum.Enum):
@@ -316,7 +316,7 @@ class DataManager:
         return None
         
 
-from chate2e.utils.message import MessageType, Encryption
+from chate2e.model.message import MessageType, Encryption
 
 
 # 使用示例

@@ -54,16 +54,18 @@ class Header:
         return str(uuid.uuid4())
     
 class Encryption:
-    def __init__(self,algorithm: str, iv: str, tag: str):
+    def __init__(self,algorithm: str, iv: str, tag: str, is_initiator: bool):
         self.algorithm = algorithm
         self.iv = iv
         self.tag = tag
+        self.is_initiator = is_initiator
 
     def to_dict(self) -> dict:
         return {
             'algorithm': self.algorithm,
             'iv': self.iv,
-            'tag': self.tag
+            'tag': self.tag,
+            'is_initiator': self.is_initiator
         }
         
 class X3DHparams:

@@ -10,7 +10,7 @@ from chate2e.client.models import (
     ChatSession,
     DataManager
 )
-from chate2e.utils.message import Message, MessageType, Encryption
+from chate2e.model.message import Message, MessageType, Encryption
 
 # Fixtures
 @pytest.fixture

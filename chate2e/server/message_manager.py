@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict
 from typing import Optional, Dict , List
-from chate2e.utils.message import Message
+from chate2e.model.message import Message
 
 class MessageManager:
     """消息管理"""
