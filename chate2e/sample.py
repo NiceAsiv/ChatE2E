@@ -52,6 +52,7 @@ class SignalProtocol:
         private_key = x25519.X25519PrivateKey.generate()
         public_key = private_key.public_key()
         self.one_time_prekeys[key_id] = (private_key, public_key)
+        print(f"[初始化] 生成一次性预密钥: {self.one_time_prekeys[key_id][1].public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw).hex()}")
         return key_id
 
     async def initiate_session(self, 
@@ -253,24 +254,6 @@ class SignalProtocol:
             salt=None,
             info=b"shared_key"
         ).derive(random_bytes)
-    
-    def generate_identity_key(self) -> None:
-        """生成身份密钥对"""
-        self.identity_key = x25519.X25519PrivateKey.generate()
-        self.identity_key_pub = self.identity_key.public_key()
-    
-    def generate_signed_prekey(self) -> None:
-        """生成预签名密钥对"""
-        self.signed_prekey = x25519.X25519PrivateKey.generate()
-        self.signed_prekey_pub = self.signed_prekey.public_key()
-    
-    def generate_one_time_prekey(self) -> int:
-        """生成一次性预密钥对"""
-        key_id = len(self.one_time_prekeys)
-        private_key = x25519.X25519PrivateKey.generate()
-        public_key = private_key.public_key()
-        self.one_time_prekeys[key_id] = (private_key, public_key)
-        return key_id
     
     def _derive_keys(self, shared_secret: bytes, salt: bytes = None) -> Tuple[bytes, bytes]:
         """从共享密钥派生根密钥和链密钥"""
