@@ -17,13 +17,14 @@ def test_e2e_encryption(crypto_helper):
     alice_priv, alice_pub = crypto.create_x25519_keypair()
     bob_priv, bob_pub = crypto.create_x25519_keypair()
 
-    alice_pub_bytes = crypto.export_x25519_public_key(alice_priv)
-    bob_pub_bytes = crypto.export_x25519_public_key(bob_priv)
+    # 导出公钥字节，注意使用公钥而不是私钥
+    alice_pub_bytes = crypto.export_x25519_public_key(alice_pub)
+    bob_pub_bytes = crypto.export_x25519_public_key(bob_pub)
 
     # 2. Alice 使用 Bob 的公钥和自己的私钥生成共享密钥
-    shared_key_alice = crypto.ecdh(alice_priv, bob_pub_bytes)
+    shared_key_alice = crypto.ecdh(alice_priv, bob_pub)  # 直接使用公钥对象
     # 3. Bob 使用 Alice 的公钥和自己的私钥生成共享密钥
-    shared_key_bob = crypto.ecdh(bob_priv, alice_pub_bytes)
+    shared_key_bob = crypto.ecdh(bob_priv, alice_pub)  # 直接使用公钥对象
     
     assert shared_key_alice == shared_key_bob
 
@@ -34,10 +35,11 @@ def test_e2e_encryption(crypto_helper):
     # 5. Alice 加密信息
     message = b"Hello, this is a secret message."
     ciphertext, tag = crypto.encrypt_aes_gcm(aes_key, message, iv)
-    print("Ciphertext:", ciphertext.hex(), "Tag:", tag.hex())
+    print("密文:", ciphertext.hex())
+    print("认证标签:", tag.hex())
     
     # 6. Bob 解密信息
     decrypted = crypto.decrypt_aes_gcm(aes_key, ciphertext, iv, tag)
-    print("Decrypted:", decrypted.decode())
+    print("解密后:", decrypted.decode())
     
     assert decrypted == message

@@ -3,6 +3,7 @@ import json
 import uuid
 import time
 import enum
+from base64 import b64encode, b64decode
 
 
 @enum.unique
@@ -53,7 +54,7 @@ class Header:
         return str(uuid.uuid4())
     
 class Encryption:
-    def __init__(self,algorithm: str, iv: str, tag: str, is_initiator: bool):
+    def __init__(self, algorithm: str, iv: bytes, tag: bytes, is_initiator: bool):
         self.algorithm = algorithm
         self.iv = iv
         self.tag = tag
@@ -62,25 +63,47 @@ class Encryption:
     def to_dict(self) -> dict:
         return {
             'algorithm': self.algorithm,
-            'iv': self.iv,
-            'tag': self.tag,
+            'iv': b64encode(self.iv).decode('utf-8'),
+            'tag': b64encode(self.tag).decode('utf-8'),
             'is_initiator': self.is_initiator
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Encryption':
+        return cls(
+            algorithm=data['algorithm'],
+            iv=b64decode(data['iv']),
+            tag=b64decode(data['tag']),
+            is_initiator=data['is_initiator']
+        )
         
 class X3DHparams:
-    def __init__(self, identity_key_pub: str,ephemeral_key_pub: str):
+    def __init__(self, identity_key_pub: bytes, signed_pre_key_pub: bytes, one_time_pre_keys_pub: bytes, ephemeral_key_pub: bytes):
         self.identity_key_pub = identity_key_pub
+        self.signed_pre_key_pub = signed_pre_key_pub
         self.ephemeral_key_pub = ephemeral_key_pub
+        self.one_time_pre_keys_pub = one_time_pre_keys_pub
 
     def to_dict(self) -> dict:
         return {
-            'identity_key_pub': self.identity_key_pub,
-            'ephemeral_key_pub': self.ephemeral_key_pub
+            'identity_key_pub': b64encode(self.identity_key_pub).decode('utf-8'),
+            'signed_pre_key_pub': b64encode(self.signed_pre_key_pub).decode('utf-8'),
+            'one_time_pre_keys_pub': b64encode(self.one_time_pre_keys_pub).decode('utf-8'),
+            'ephemeral_key_pub': b64encode(self.ephemeral_key_pub).decode('utf-8')
             }
-        
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'X3DHparams':
+        return cls(
+            identity_key_pub=b64decode(data['identity_key_pub']),
+            signed_pre_key_pub=b64decode(data['signed_pre_key_pub']),
+            one_time_pre_keys_pub=b64decode(data['one_time_pre_keys_pub']),
+            ephemeral_key_pub=b64decode(data['ephemeral_key_pub'])
+        )
+
 class Message:
     def __init__(self, message_id: str, sender_id: str, session_id : str,
-                 receiver_id: str, encrypted_content: str, 
+                 receiver_id: str, encrypted_content: bytes,
                  message_type: MessageType.MESSAGE,encryption: Encryption = None, timestamp: float = time.time(),X3DHparams: X3DHparams = None):
         self.header = Header(sender_id, receiver_id, session_id, message_id, message_type, timestamp)
         self.encrypted_content = encrypted_content
@@ -90,7 +113,9 @@ class Message:
     def to_dict(self) -> dict:
         return {
             'header': self.header.to_dict(),
-            'encrypted_content': self.encrypted_content,
+            'encrypted_content': self.encrypted_content if isinstance(self.encrypted_content, str)
+            else b64encode(self.encrypted_content).decode('utf-8') if isinstance(self.encrypted_content, bytes)
+            else str(self.encrypted_content),
             'encryption': self.encryption.to_dict() if self.encryption else None,
             'X3DHparams': self.X3DHparams.to_dict() if self.X3DHparams else None
         }
@@ -100,22 +125,25 @@ class Message:
         # 从嵌套的header数据创建Header对象
         header_data = data['header']
         header_data['message_type'] = MessageType(header_data['message_type'])  # 将整数转换为枚举
-        
-        # 处理可选的加密参数
+
+        # Handle encryption data
         encryption_data = data.get('encryption')
-        encryption = Encryption(**encryption_data) if encryption_data else None
+        encryption = Encryption.from_dict(encryption_data) if encryption_data else None
         
         # 处理可选的X3DH参数
         x3dh_data = data.get('X3DHparams')
         x3dh = X3DHparams(**x3dh_data) if x3dh_data else None
-        
+
+        # Handle encrypted content
+        encrypted_content = b64decode(data['encrypted_content']) if isinstance(data['encrypted_content'], str) else data['encrypted_content']
+
         # 使用header中的数据创建Message对象
         return cls(
             message_id=header_data['message_id'],
             sender_id=header_data['sender_id'],
             session_id=header_data['session_id'],
             receiver_id=header_data['receiver_id'],
-            encrypted_content=data['encrypted_content'],
+            encrypted_content= encrypted_content,
             message_type=header_data['message_type'],
             timestamp=header_data['timestamp'],
             encryption=encryption,

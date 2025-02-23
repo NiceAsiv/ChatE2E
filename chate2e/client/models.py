@@ -1,6 +1,9 @@
 from dataclasses import dataclass, asdict, field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional , Tuple
 from datetime import datetime, timezone
+from chate2e.model.bundle import Bundle, LocalBundle
+import hashlib
+from base64 import b64encode
 
 import json
 import os
@@ -62,6 +65,10 @@ class UserProfile:
     status: UserStatus = field(default=UserStatus.OFFLINE)  # 用户状态
     last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))  # 最后在线时间
     friends: List[Friend] = field(default_factory=list)  # 好友列表
+    password_hash: Optional[str] = None  # 密码哈希值
+    salt: Optional[str] = None  # 密码哈希盐值
+    bundle: Optional[Bundle] = None  # 密钥Bundle
+    localBundle: Optional[LocalBundle] = None  # 本地密钥Bundle
     
     AVATAR_DIR = "assets/avatars"
     DEFAULT_AVATAR = "default.png"
@@ -102,6 +109,52 @@ class UserProfile:
         """获取指定好友"""
         return next((f for f in self.friends if f.user_id == friend_id), None)
     
+    @staticmethod
+    def _hash_password(password: str, salt: str = None) -> Tuple[str, str]:
+        """密码加密"""
+        if not salt:
+            salt = b64encode(os.urandom(16)).decode('utf-8')
+        pw_hash = hashlib.pbkdf2_hmac(
+            'sha256', 
+            password.encode(), 
+            salt.encode(), 
+            100000
+        )
+        return b64encode(pw_hash).decode('utf-8'), salt
+    
+    def set_password(self, password: str):
+        """设置密码"""
+        self.password_hash, self.salt = self._hash_password(password)
+        
+    def verify_password(self, password: str) -> bool:
+        """验证密码"""
+        if not self.password_hash or not self.salt:
+            return False
+        pw_hash, _ = self._hash_password(password, self.salt)
+        return pw_hash == self.password_hash
+    
+    def set_bundle(self, bundle: Bundle):
+        """设置Signal Bundle"""
+        if isinstance(bundle, Bundle):
+            self.bundle = bundle  # 直接存储Bundle对象
+        else:
+            raise ValueError("bundle must be a Bundle instance")
+
+    def set_local_bundle(self, localBundle: LocalBundle):
+        """设置Signal Bundle"""
+        if isinstance(localBundle, LocalBundle):
+            self.localBundle = localBundle
+        else:
+            raise ValueError("localBundle must be a LocalBundle instance")
+
+    def get_local_bundle(self) -> Optional[LocalBundle]:
+        """获取Signal Bundle"""
+        return self.localBundle  # 直接返回Bundle对象
+        
+    def get_bundle(self) -> Optional[Bundle]:
+        """获取Signal Bundle"""
+        return self.bundle  # 直接返回Bundle对象
+    
     def to_dict(self) -> dict:
         return {
             'user_id': self.user_id,
@@ -109,19 +162,34 @@ class UserProfile:
             'avatar_path': self.avatar_path,
             'status': self.status.value,
             'last_seen': self.last_seen.isoformat(),
+            'password_hash': self.password_hash,
+            'salt': self.salt,
+            'bundle': self.bundle.to_dict() if self.bundle else None,  # Bundle对象转字典
+            'localBundle': self.localBundle.to_dict() if self.localBundle else None,
             'friends': [friend.to_dict() for friend in self.friends]
         }
     
     @classmethod
     def from_dict(cls, data: dict) -> 'UserProfile':
+        bundle_data = data.get('bundle')
+        bundle = Bundle.from_dict(bundle_data) if bundle_data else None
+
+        local_bundle_data = data.get('localBundle')
+        local_bundle = LocalBundle.from_dict(local_bundle_data) if local_bundle_data else None
+        
         return cls(
             user_id=data['user_id'],
             username=data['username'],
             avatar_path=data['avatar_path'],
             status=UserStatus.from_str(data['status']),
-            last_seen=data['last_seen'],
-            friends=[Friend.from_dict(friend_data) for friend_data in data['friends']]
+            last_seen=datetime.fromisoformat(data['last_seen']),
+            password_hash=data.get('password_hash'),
+            salt=data.get('salt'),
+            bundle=bundle,
+            localBundle=local_bundle,
+            friends=[Friend.from_dict(friend_data) for friend_data in data.get('friends', [])]
         )
+
 
 @dataclass
 class ChatSession:
@@ -205,23 +273,22 @@ class ChatSession:
 
 class DataManager:
     """数据管理类"""
-
-    def __init__(self, user_id, base_dir: str = "chat_data"):
+    def __init__(self, user_id: Optional[str] = None, base_dir: str = "chat_data"):
+        self.base_dir = base_dir
         self.useruuid = user_id
-        self.user_data_dir = os.path.join(base_dir, user_id)
-        self.user_file = os.path.join(base_dir, user_id, "user_profile.json")
-        self.sessions_file = os.path.join(base_dir, user_id, "chat_sessions.json")
-        
-        #确保目录存在
-        os.makedirs(self.user_data_dir, exist_ok=True)
         
         # 初始化数据
-        self.user: UserProfile = None
+        self.user: Optional[UserProfile] = None
         self.sessions: Dict[str, ChatSession] = {}
         
-        # 加载数据
-        self.load_data()
-    
+        # 如果有用户ID，加载用户数据
+        if user_id:
+            self.user_data_dir = os.path.join(base_dir, user_id)
+            self.user_file = os.path.join(self.user_data_dir, "user_profile.json")
+            self.sessions_file = os.path.join(self.user_data_dir, "chat_sessions.json")
+            os.makedirs(self.user_data_dir, exist_ok=True)
+            self.load_data()
+
     def load_data(self):
         """加载所有数据"""
         # 加载用户数据
@@ -238,19 +305,93 @@ class DataManager:
                     session_data['session_id']: ChatSession.from_dict(session_data)
                     for session_data in sessions_data
                 }
+
+    def register_user(self, username: str, password: str, user_uuid: str, bundle: Bundle ,local_bundle: LocalBundle) -> bool:
+        """注册新用户"""
+        try:
+            # 更新用户ID相关路径
+            self.useruuid = user_uuid
+            self.user_data_dir = os.path.join(self.base_dir, user_uuid)
+            self.user_file = os.path.join(self.user_data_dir, "user_profile.json")
+            self.sessions_file = os.path.join(self.user_data_dir, "chat_sessions.json")
+            os.makedirs(self.user_data_dir, exist_ok=True)
+            
+            # 创建新用户档案
+            user = UserProfile(
+                user_id=user_uuid,
+                username=username,
+                avatar_path=os.path.join(UserProfile.AVATAR_DIR, UserProfile.DEFAULT_AVATAR),
+                status=UserStatus.OFFLINE
+            )
+            
+            # 设置密码和Bundle
+            user.set_password(password)
+            user.set_bundle(bundle)
+            user.set_local_bundle(local_bundle)
+            
+            # 保存用户数据
+            self.user = user
+            self.save_data()
+            return True
+            
+        except Exception as e:
+            print(f"注册用户失败: {e}")
+            return False
+            
+    def verify_user(self, username: str, password: str) -> Optional[str]:
+        """验证用户登录"""
+        try:
+            # 遍历chat_data目录查找用户
+            if not os.path.exists(self.base_dir):
+                return None
+                
+            for user_dir in os.listdir(self.base_dir):
+                profile_path = os.path.join(self.base_dir, user_dir, "user_profile.json")
+                if os.path.exists(profile_path):
+                    with open(profile_path, 'r', encoding='utf-8') as f:
+                        user_data = json.load(f)
+                        if user_data['username'] == username:
+                            # 找到用户，加载数据
+                            self.useruuid = user_data['user_id']
+                            self.user_data_dir = os.path.join(self.base_dir, self.useruuid)
+                            self.user_file = os.path.join(self.user_data_dir, "user_profile.json")
+                            self.sessions_file = os.path.join(self.user_data_dir, "chat_sessions.json")
+                            self.user = UserProfile.from_dict(user_data)
+                            
+                            # 验证密码
+                            if self.user.verify_password(password):
+                                return self.user.user_id
+                            break
+            return None
+            
+        except Exception as e:
+            print(f"验证用户失败: {e}")
+            return None
+
+    def get_bundle(self) -> Optional[Bundle]:
+        """获取用户的Bundle"""
+        if self.user:
+            return self.user.get_bundle()
+        return None
+
+    def get_local_bundle(self) -> Optional[LocalBundle]:
+        """获取用户的Bundle"""
+        if self.user:
+            return self.user.get_local_bundle()
+        return None
                 
     def set_user(self, user: UserProfile):
         """设置用户数据"""
         self.user = user
         self.save_data()
-        
+
     def add_message(self, session_id: str, message: Message):
         """添加消息到指定会话"""
         if session_id in self.sessions:
             self.sessions[session_id].add_message(message)
             self.save_data()
         else:
-            print(f"会话 {session_id} 不存在！")    
+            print(f"会话 {session_id} 不存在！")
     
     def add_friend(self, friend: Friend):
         """添加好友"""
@@ -289,7 +430,7 @@ class DataManager:
         self.sessions[session.session_id] = session
         self.save_data()
         return session
-    
+
     def create_session_by_sender_session_id(self, session_id: str, user2_id: str) -> ChatSession:
         """根据发送者会话ID创建会话"""
         # 确保用户ID顺序一致，避免重复会话
@@ -314,89 +455,3 @@ class DataManager:
             if sorted([session.participant1_id, session.participant2_id]) == participant_ids:
                 return session.last_message
         return None
-        
-
-from chate2e.model.message import MessageType, Encryption
-
-
-# 使用示例
-def create_sample_data():
-    # 创建数据管理器实例
-    dm_alice = DataManager("u001")
-    dm_bob = DataManager("u002")
-    
-    # 创建用户档案
-    alice = UserProfile(
-        user_id="u001",
-        username="Alice",
-        avatar_path="assets/avatars/alice.png",
-        status=UserStatus.ONLINE
-    )
-    
-    bob = UserProfile(
-        user_id="u002",
-        username="Bob",
-        avatar_path="assets/avatars/bob.png",
-        status=UserStatus.OFFLINE
-    )
-    
-    # 保存用户信息
-    dm_alice.set_user(alice)
-    dm_bob.set_user(bob)
-    
-    # 添加好友关系
-    dm_alice.add_friend(Friend.from_dict(bob.to_dict()))
-    dm_bob.add_friend(Friend.from_dict(alice.to_dict()))
-    
-    # Alice 创建会话
-    session = dm_alice.get_or_create_session(bob.user_id)
-    
-    # 创建初始化消息
-    init_message = Message(
-        message_id=str(uuid.uuid4()),
-        session_id=session.session_id,
-        sender_id=alice.user_id,
-        receiver_id=bob.user_id,
-        encrypted_content="Hello Bob!",
-        message_type=MessageType.INITIATE,  # 使用INITIATE类型表示这是初始化消息
-        encryption=Encryption(
-            algorithm="AES-GCM",
-            iv="alice_iv",
-            tag="alice_tag"
-        )
-    )
-    
-    # 保存消息到 Alice 和 Bob 的聊天会话中
-    dm_alice.add_message(session.session_id, init_message)
-
-    # 模拟 Bob 接收到消息
-    bob_session = dm_bob.create_session_by_sender_session_id(
-        session_id=init_message.header.session_id,
-        user2_id=alice.user_id
-    )
-
-    # Bob 接收并保存确认消息
-    ack_message = Message(
-        message_id=str(uuid.uuid4()),
-        session_id=session.session_id,
-        sender_id=bob.user_id,
-        receiver_id=alice.user_id,
-        encrypted_content="Hi Alice, got your message!",
-        message_type=MessageType.ACK_INITIATE,  # 使用ACK_INITIATE类型表示这是确认消息
-        encryption=Encryption(
-            algorithm="AES-GCM",
-            iv="bob_iv",
-            tag="bob_tag"
-        )
-    )
-
-    # 保存消息到 Bob 和 Alice 的聊天会话中
-    dm_bob.add_message(bob_session.session_id, init_message)
-    dm_bob.add_message(bob_session.session_id, ack_message)
-    
-    dm_alice.add_message(session.session_id, ack_message)
-
-    print("示例数据创建成功！")
-
-if __name__ == "__main__":
-    create_sample_data()

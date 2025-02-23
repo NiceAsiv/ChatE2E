@@ -1,8 +1,0 @@
-name: chat_e2e_env  # 环境名称
-channels:
-  - defaults
-dependencies:
-  - python=3.8
-  - cryptography
-  - pycryptodome
-  - pytest

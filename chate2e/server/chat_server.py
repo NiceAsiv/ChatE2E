@@ -1,73 +1,31 @@
-from flask import Flask, request, jsonify
-from flask_socketio import SocketIO, emit, join_room, leave_room
-from typing import Dict, Optional
-from flask_cors import CORS
 import json
-from typing import List
-import uuid
 import os
-from message_manager import MessageManager
+import uuid
+from typing import Dict, Optional
+
 from chate2e.model.bundle import Bundle
-from chate2e.model.message import Message, MessageType, Encryption
+from chate2e.model.message import Message
+from chate2e.server.socket_manager import socketio
 from chate2e.server.user import User
 
-app = Flask(__name__)
-CORS(app)  # 启用CORS支持
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 def generate_short_uuid() -> str:
     """生成16位的UUID"""
-    return uuid.uuid4().hex[:16]  
+    return uuid.uuid4().hex[:16]
             
 class ChatServer:
     def __init__(self):
         self.users: Dict[str, User] = {}  # 用户ID -> 用户实例
         self.username_map: Dict[str, str] = {}  # username -> uuid
-        self.socket_sessions: Dict[str, str] = {}  # user_id -> socket_id
-        self.message_manager = MessageManager()
         self._load_users()
-     
-    def add_socket_session(self, user_id: str, socket_id: str) -> None:
-        """添加Socket会话"""
-        self.socket_sessions[user_id] = socket_id
-        user = self.users.get(user_id)
-        if user and user.offline_messages:
-            for message in user.offline_messages:
-                emit('message', message.to_dict())
-            user.offline_messages.clear()
-            user.is_online = True
-            self._save_users()
-        
-    def remove_socket_session(self, socket_id: str) -> None:
-        """移除Socket会话"""
-        for user_id, sid in list(self.socket_sessions.items()):
-            if sid == socket_id:
-                del self.socket_sessions[user_id]
-                user = self.get_user(user_id)
-                if user:
-                    user.is_online = False
-                    self._save_users()
-                break
 
     def forward_message(self, message: Message) -> bool:
-        """转发消息到目标用户"""
-        receiver_id = message.header.receiver_id
-        # 检查接收者是否在线
-        if receiver_id in self.socket_sessions:
-            socket_id = self.socket_sessions[receiver_id]
-            try:
-                # 通过socket发送消息
-                socketio.emit('new_message', message.to_dict(), room=socket_id)
-                return True
-            except Exception as e:
-                print(f"消息转发失败: {e}")
-                return False
-        else:
-            # 接收者离线，存储为离线消息
-            receiver = self.users.get(receiver_id)
-            if receiver:
-                receiver.offline_messages.append(message)
-                self._save_users()
+        """广播消息给所有连接的客户端"""
+        try:
+            socketio.emit('message', message.to_dict())
+            return True
+        except Exception as e:
+            print(f"广播消息失败: {e}")
             return False
     
     def _load_users(self) -> None:
@@ -128,26 +86,3 @@ class ChatServer:
     def get_user(self, user_uuid: str) -> Optional[User]:
         """获取用户对象"""
         return self.users.get(user_uuid)
-    
-    def handle_message(self, sender_id: str, receiver_id: str, 
-                      session_id: str, encrypted_content: str,
-                      encryption: Optional[Dict] = None) -> Message:
-        """处理新消息"""
-        # 创建消息对象
-        message = Message(
-            message_id=Message.generate_id(),
-            session_id=session_id,
-            sender_id=sender_id,
-            receiver_id=receiver_id,
-            encrypted_content=encrypted_content,
-            encryption=encryption
-        )
-        
-        # 保存消息历史
-        self.message_manager.add_message(message)
-        
-        # 如果接收者离线,存储为离线消息
-        if not self.online_users.get(receiver_id, False):
-            self.message_manager.add_offline_message(message)
-            
-        return message

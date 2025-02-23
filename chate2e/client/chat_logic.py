@@ -1,28 +1,30 @@
 import sys
-import uuid
+
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication, QListWidgetItem, QMessageBox, QDialog,
     QVBoxLayout, QFormLayout, QLineEdit, QDialogButtonBox, QFileDialog
 )
-from PyQt6.QtCore import Qt
 
-from chate2e.client.models import Message, DataManager, Friend
-from chate2e.crypto.protocol.x3dh import X3DHProtocol
 from chate2e.client.chat_ui import ChatWindowUI, ContactItem, ChatItem, DEFAULT_AVATAR_PATH
+from chate2e.client.client_server import ChatClient
+from chate2e.client.models import Message, DataManager, Friend, UserStatus
 from chate2e.model.message import MessageType
 
 
 class ChatWindow(ChatWindowUI):
-    def __init__(self, current_user_id):
+    def __init__(self, current_user_id: str,chat_client: ChatClient ,data_manager: DataManager):
         super().__init__()
+
+        self.chat_client = chat_client
         self.current_session_id = None
         self.current_user_id = current_user_id
 
         # 初始化数据管理器
-        self.data_manager = DataManager(current_user_id)
+        self.data_manager = data_manager
 
-        # 初始化 X3DH 协议实例
-        self.x3dh = X3DHProtocol(current_user_id)
+        #注册消息处理器
+        self.chat_client.register_message_handler(self.handle_received_message)
 
         # 加载联系人列表
         self.load_contacts()
@@ -36,6 +38,9 @@ class ChatWindow(ChatWindowUI):
                 status="online"
             )
             self.left_layout.insertWidget(0, self.user_info)
+
+        # self.selected_contact: Friend
+        self.selected_contact = None
 
         # 绑定事件
         self.send_btn.clicked.connect(self.handle_send_message)
@@ -79,6 +84,9 @@ class ChatWindow(ChatWindowUI):
             return
 
         for message in messages:
+            #如果消息的类型是init,则不显示
+            if message.header.message_type == MessageType.INITIATE:
+                continue
             item = QListWidgetItem(self.messages_area)
             is_sender = message.header.sender_id == self.current_user_id
             
@@ -97,30 +105,14 @@ class ChatWindow(ChatWindowUI):
                 avatar_path = sender.avatar_path
                 username = sender.username
 
-            # 解密消息（如果需要）
+            # 确保消息内容是字符串
             display_content = message.encrypted_content
-            # if message.encryption:
-            #     try:
-            #         receiver_id = message.receiver_id
-            #         shared_secret = self.x3dh.get_shared_secret_passive(
-            #             receiver_id if is_sender else message.sender_id
-            #         )
-            #         if shared_secret:
-            #             # 解密消息
-            #             iv = bytes.fromhex(message.encryption['iv'])
-            #             ciphertext = bytes.fromhex(message.encryption['ciphertext'])
-            #             tag = bytes.fromhex(message.encryption['tag'])
-            #             encrypted = ciphertext + tag
-            #             decrypted = self.x3dh.crypto_helper.decrypt_aes_gcm(
-            #                 shared_secret,
-            #                 encrypted,
-            #                 iv
-            #             )
-            #             display_content = decrypted.decode()
-            #         else:
-            #             display_content = "无法获取解密密钥"
-            #     except Exception as e:
-            #         display_content = f"消息解密失败: {str(e)}"
+            if isinstance(display_content, bytes):
+                try:
+                    display_content = display_content.decode('utf-8')
+
+                except UnicodeDecodeError:
+                    display_content = str(display_content)
 
             widget = ChatItem(
                 avatar_path,
@@ -154,6 +146,7 @@ class ChatWindow(ChatWindowUI):
             friend_contact.user_id
         )
         self.current_session_id = session.session_id
+        self.selected_contact = friend_contact
 
         # 加载消息
         self.load_messages(session.session_id)
@@ -162,9 +155,10 @@ class ChatWindow(ChatWindowUI):
         self.message_input.clear()
         self.message_input.setFocus()
 
+
     def handle_send_message(self):
         """处理发送消息"""
-        if not self.current_session_id:
+        if not self.current_session_id or not self.selected_contact:
             return
 
         content = self.message_input.text().strip()
@@ -175,53 +169,71 @@ class ChatWindow(ChatWindowUI):
         if not session:
             return
 
-        # 确定接收者ID
-        receiver_id = session.get_other_participant(self.current_user_id)
-
-        # 获取共享密钥
-        # shared_secret = self.x3dh.get_shared_secret_active(receiver_id)
-        # if not shared_secret:
-        #     QMessageBox.warning(self, "错误", f"无法获取与 {receiver_id} 的共享密钥")
-        #     return
+        if not self.chat_client.protocol.session_initialized:
+            if not self.chat_client.init_session_sync(self.selected_contact.user_id,self.current_session_id):
+                QMessageBox.warning(self, "错误", "会话初始化失败")
+                return
 
         try:
             # 加密消息
-            # iv = self.x3dh.crypto_helper.get_random_bytes(12)
-            # encrypted = self.x3dh.crypto_helper.encrypt_aes_gcm(
-            #     shared_secret,
-            #     content.encode(),
-            #     iv
-            # )
-            # ciphertext = encrypted[:-16]
-            # tag = encrypted[-16:]
+            encrypted_message = self.chat_client.protocol.encrypt_message(content)
+            #从加密消息中重组消息
 
-            # 创建消息对象
-            message = Message(
-                message_id=str(uuid.uuid4()),
-                session_id=self.current_session_id,
-                sender_id=self.current_user_id,
-                receiver_id=receiver_id,
-                encrypted_content=content,
+            decrypted_message =  Message(
+                message_id=encrypted_message.header.message_id,
+                sender_id=encrypted_message.header.sender_id,
+                session_id=encrypted_message.header.session_id,
+                receiver_id=encrypted_message.header.receiver_id,
+                encryption=encrypted_message.encryption,
                 message_type=MessageType.MESSAGE,
-                encryption=None
-                # encryption={
-                #     "iv": iv.hex(),
-                #     "ciphertext": ciphertext.hex(),
-                #     "tag": tag.hex()
-                # }
+                encrypted_content= content.encode('utf-8')
             )
 
-            # 保存消息
-            self.data_manager.add_message(session.session_id, message)
+            # 发送消息到服务器
+            if self.chat_client.send_message_sync(self.selected_contact.user_id, encrypted_message):
 
-            # 清空输入框
-            self.message_input.clear()
+                self.data_manager.add_message(session.session_id, decrypted_message)
 
-            # 重新加载消息
-            self.load_messages(self.current_session_id)
+                # 清空输入框
+                self.message_input.clear()
+
+                # 重新加载消息
+                self.load_messages(self.current_session_id)
+            else:
+                QMessageBox.warning(self, "错误", "消息发送失败")
 
         except Exception as e:
             QMessageBox.warning(self, "错误", f"消息发送失败: {str(e)}")
+
+
+    def handle_received_message(self, message: Message):
+        """处理接收到的消息"""
+        try:
+            # 解密消息
+            decrypted_text = self.chat_client.protocol.decrypt_message(message)
+            # 获取或创建会话
+            session = self.data_manager.get_or_create_session(message.header.sender_id)
+
+
+            # 创建新的消息对象（包含解密后的内容）
+            message_obj = Message(
+                message_id=message.header.message_id,
+                session_id=session.session_id,
+                sender_id=message.header.sender_id,
+                receiver_id=message.header.receiver_id,
+                encrypted_content=decrypted_text,  # 存储解密后的内容
+                message_type=MessageType.MESSAGE,
+                encryption=message.encryption  # 保留加密信息
+            )
+
+            # 保存消息
+            self.data_manager.add_message(session.session_id, message_obj)
+
+            # 如果是当前会话，刷新消息列表
+            if session.session_id == self.current_session_id:
+                self.load_messages(session.session_id)
+        except Exception as e:
+            print(f"处理消息失败: {str(e)}")
 
     def handle_file_upload(self):
         """处理文件上传"""
@@ -253,17 +265,18 @@ class ChatWindow(ChatWindowUI):
             return
 
         # 检查用户是否存在 需要到服务端获取用户信息
-        # user_bundle = self.network_service.get_key_bundle(user_id)
-        # if not user_bundle:
-        #     QMessageBox.warning(self, "警告", "用户不存在")
-        #     return
+        # user_bundle = self.chat_client.get_user_bundle(user_id)
+        user_name = self.chat_client.get_user_name(user_id)
+        if not user_name:
+            QMessageBox.warning(self, "警告", "用户不存在")
+            return
         
         # 假设用户存在，创建一个Friend对象
         new_friend = Friend(
             user_id=user_id,
-            username=user_id,  # 假设username和user_id相同
+            username=user_name,
             avatar_path=DEFAULT_AVATAR_PATH,  # 使用默认头像
-            status="offline"  # 默认状态为离线
+            status= UserStatus.ONLINE
         )
 
         # 检查是否已经是联系人
@@ -275,7 +288,6 @@ class ChatWindow(ChatWindowUI):
         # 更新联系人列表
         self.data_manager.add_friend(new_friend)
         
-
         # 刷新联系人列表
         self.load_contacts()
         QMessageBox.information(self, "成功", "联系人添加成功")

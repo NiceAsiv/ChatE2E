@@ -49,8 +49,9 @@ def test_ecdh(crypto_helper):
     assert shared_key1 == shared_key2
 
 def test_export_x25519_public_key(crypto_helper):
-    private_key, _ = crypto_helper.create_x25519_keypair()
-    public_key_bytes = crypto_helper.export_x25519_public_key(private_key)
+    """测试导出 X25519 公钥"""
+    private_key, public_key = crypto_helper.create_x25519_keypair()
+    public_key_bytes = crypto_helper.export_x25519_public_key(public_key)  # 修改这里，使用公钥
     
     assert isinstance(public_key_bytes, bytes)
     assert len(public_key_bytes) == 32

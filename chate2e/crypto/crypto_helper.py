@@ -54,7 +54,7 @@ class CryptoHelper:
         data = unpadder.update(padded_data) + unpadder.finalize()
         return data
      
-    def encrypt_aes_gcm(self, key: bytes, data: bytes, iv: bytes) -> bytes:
+    def encrypt_aes_gcm(self, key: bytes, data: bytes, iv: bytes) -> Tuple[bytes, bytes]:
         """
         使用 AES-GCM 模式进行加密。
         :param key: 原始密钥
@@ -113,18 +113,45 @@ class CryptoHelper:
             raise TypeError("pub_key must be an instance of x25519.X25519PublicKey, not %r" % pub_key)
         return priv_key.exchange(pub_key)
     
-    def export_x25519_public_key(self, private_key: x25519.X25519PrivateKey) -> bytes:
+    def export_x25519_public_key(self, public_key: x25519.X25519PublicKey) -> bytes:
         """
         导出 X25519 公钥的原始字节表示。
-        :param private_key: X25519 私钥对象
+        :param public_key: X25519 公钥对象
         :return: 公钥字节
         """
-        public_key = private_key.public_key()
         return public_key.public_bytes(
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw
         )
         
+    def export_x25519_private_key(self, private_key: x25519.X25519PrivateKey) -> bytes:
+        """
+        导出 X25519 私钥的原始字节表示。
+        :param private_key: X25519 私钥对象
+        :return: 私钥字节
+        """
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+    
+    def import_x25519_private_key(self, private_key: bytes) -> x25519.X25519PrivateKey:
+        """
+        导入 X25519 私钥。
+        :param private_key: X25519 私钥字节
+        :return: X25519 私钥对象
+        """
+        return x25519.X25519PrivateKey.from_private_bytes(private_key)
+    
+    def import_x25519_public_key(self, public_key: bytes) -> x25519.X25519PublicKey:
+        """
+        导入 X25519 公钥。
+        :param public_key: X25519 公钥字节
+        :return: X25519 公钥对象
+        """
+        return x25519.X25519PublicKey.from_public_bytes(public_key)    
+            
     def export_ed25519_public_key(self,private_key: ed25519.Ed25519PrivateKey) -> bytes:
         """
         导出 Ed25519 公钥的原始字节表示。
