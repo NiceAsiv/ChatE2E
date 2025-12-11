@@ -28,13 +28,14 @@ class ChatApp:
     def on_login_success(self, username: str , user_id: str):
         """处理登录成功事件"""
         print(f"用户 {username} 登录成功")
-        print(self.server.user_id == user_id)
+        print(f"用户ID验证: {self.server.user_id == user_id}")
         try :
             if self.server.connect_sync():
                 print("连接服务器成功")
                 # 关闭登录窗口
                 self.login_window.login_window.close()
-                self.chat_window = ChatWindow(username, self.server, self.data_manager)
+                # 传递 user_id 而不是 username
+                self.chat_window = ChatWindow(user_id, self.server, self.data_manager)
                 self.chat_window.show()
 
         except Exception as e:

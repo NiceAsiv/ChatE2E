@@ -61,12 +61,20 @@ class Encryption:
         self.is_initiator = is_initiator
 
     def to_dict(self) -> dict:
-        return {
+        # 处理可能已经是字符串的情况
+        def encode_if_bytes(value):
+            if isinstance(value, bytes):
+                return b64encode(value).decode('utf-8')
+            return value  # 已经是字符串
+        
+        result = {
             'algorithm': self.algorithm,
-            'iv': b64encode(self.iv).decode('utf-8'),
-            'tag': b64encode(self.tag).decode('utf-8'),
+            'iv': encode_if_bytes(self.iv),
+            'tag': encode_if_bytes(self.tag),
             'is_initiator': self.is_initiator
         }
+        
+        return result
 
     @classmethod
     def from_dict(cls, data: dict) -> 'Encryption':
@@ -85,12 +93,18 @@ class X3DHparams:
         self.one_time_pre_keys_pub = one_time_pre_keys_pub
 
     def to_dict(self) -> dict:
+        # 处理可能已经是字符串的情况
+        def encode_if_bytes(value):
+            if isinstance(value, bytes):
+                return b64encode(value).decode('utf-8')
+            return value  # 已经是字符串
+        
         return {
-            'identity_key_pub': b64encode(self.identity_key_pub).decode('utf-8'),
-            'signed_pre_key_pub': b64encode(self.signed_pre_key_pub).decode('utf-8'),
-            'one_time_pre_keys_pub': b64encode(self.one_time_pre_keys_pub).decode('utf-8'),
-            'ephemeral_key_pub': b64encode(self.ephemeral_key_pub).decode('utf-8')
-            }
+            'identity_key_pub': encode_if_bytes(self.identity_key_pub),
+            'signed_pre_key_pub': encode_if_bytes(self.signed_pre_key_pub),
+            'one_time_pre_keys_pub': encode_if_bytes(self.one_time_pre_keys_pub),
+            'ephemeral_key_pub': encode_if_bytes(self.ephemeral_key_pub)
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> 'X3DHparams':
@@ -132,10 +146,19 @@ class Message:
         
         # 处理可选的X3DH参数
         x3dh_data = data.get('X3DHparams')
-        x3dh = X3DHparams(**x3dh_data) if x3dh_data else None
+        x3dh = X3DHparams.from_dict(x3dh_data) if x3dh_data else None
 
         # Handle encrypted content
-        encrypted_content = b64decode(data['encrypted_content']) if isinstance(data['encrypted_content'], str) else data['encrypted_content']
+        encrypted_content_raw = data['encrypted_content']
+        
+        if isinstance(encrypted_content_raw, str):
+            try:
+                encrypted_content = b64decode(encrypted_content_raw)
+            except Exception as e:
+                print(f"[ERROR] Base64解码失败: {e}")
+                raise
+        else:
+            encrypted_content = encrypted_content_raw
 
         # 使用header中的数据创建Message对象
         return cls(

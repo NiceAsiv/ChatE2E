@@ -1,9 +1,9 @@
 import sys
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication, QListWidgetItem, QMessageBox, QDialog,
-    QVBoxLayout, QFormLayout, QLineEdit, QDialogButtonBox, QFileDialog
+    QVBoxLayout, QFormLayout, QLineEdit, QDialogButtonBox, QFileDialog, QMenu
 )
 
 from chate2e.client.chat_ui import ChatWindowUI, ContactItem, ChatItem, DEFAULT_AVATAR_PATH
@@ -13,6 +13,10 @@ from chate2e.model.message import MessageType
 
 
 class ChatWindow(ChatWindowUI):
+    # 定义信号
+    friend_list_update_signal = pyqtSignal()
+    message_received_signal = pyqtSignal(str)
+
     def __init__(self, current_user_id: str,chat_client: ChatClient ,data_manager: DataManager):
         super().__init__()
 
@@ -25,6 +29,13 @@ class ChatWindow(ChatWindowUI):
 
         #注册消息处理器
         self.chat_client.register_message_handler(self.handle_received_message)
+        
+        # 连接信号到槽
+        self.friend_list_update_signal.connect(self.load_contacts)
+        self.message_received_signal.connect(self.on_message_received)
+        
+        # 注册好友更新处理器
+        self.chat_client.register_friend_update_handler(self.on_friend_list_updated)
 
         # 加载联系人列表
         self.load_contacts()
@@ -48,6 +59,10 @@ class ChatWindow(ChatWindowUI):
         self.upload_btn.clicked.connect(self.handle_file_upload)
         self.contact_list.itemClicked.connect(self.on_contact_selected)
         self.add_contact_btn.clicked.connect(self.show_add_contact_dialog)
+        
+        # 设置联系人列表右键菜单
+        self.contact_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.contact_list.customContextMenuRequested.connect(self.show_contact_context_menu)
 
     def load_contacts(self):
         """加载联系人列表"""
@@ -60,11 +75,21 @@ class ChatWindow(ChatWindowUI):
            
             # 更新会话的最后一条消息
             last_message = self.data_manager.get_last_message(friend.user_id)
+            
+            display_content = ""
+            if last_message:
+                display_content = last_message.encrypted_content
+                if isinstance(display_content, bytes):
+                    try:
+                        display_content = display_content.decode('utf-8')
+                    except UnicodeDecodeError:
+                        display_content = str(display_content)
+
             item = QListWidgetItem()
             widget = ContactItem(
                 friend.avatar_path,
                 friend.username,
-                last_message.encrypted_content if last_message else "",
+                display_content,
                 friend.status
             )
             item.setSizeHint(widget.sizeHint())
@@ -141,10 +166,36 @@ class ChatWindow(ChatWindowUI):
         # 更新聊天标题
         self.chat_header.setText(f"与 {friend_contact.username} 的对话")
 
-        # 获取或创建会话
-        session = self.data_manager.get_or_create_session(
-            friend_contact.user_id
-        )
+        # 从服务器获取或创建会话
+        try:
+            import requests
+            response = requests.post(
+                f"{self.chat_client.server_url}/session/get",
+                json={
+                    'user1_id': self.current_user_id,
+                    'user2_id': friend_contact.user_id
+                },
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                server_session_id = result['session_id']
+                print(f"[UI] 从服务器获取会话ID: {server_session_id}")
+                
+                # 使用服务器返回的session_id获取或创建本地会话
+                session = self.data_manager.get_or_create_session_with_id(
+                    server_session_id,
+                    friend_contact.user_id
+                )
+            else:
+                print(f"[UI] 从服务器获取会话ID失败，使用本地创建")
+                session = self.data_manager.get_or_create_session(friend_contact.user_id)
+                
+        except Exception as e:
+            print(f"[UI] 获取服务器会话ID异常: {e}，使用本地创建")
+            session = self.data_manager.get_or_create_session(friend_contact.user_id)
+        
         self.current_session_id = session.session_id
         self.selected_contact = friend_contact
 
@@ -169,20 +220,35 @@ class ChatWindow(ChatWindowUI):
         if not session:
             return
 
-        if not self.chat_client.protocol.session_initialized:
-            if not self.chat_client.init_session_sync(self.selected_contact.user_id,self.current_session_id):
+        # 检查与当前联系人的会话是否已初始化
+        peer_id = self.selected_contact.user_id
+        if not self.chat_client.sessions.get(peer_id):
+            # 初始化会话，传入当前的session_id
+            success, returned_session_id = self.chat_client.init_session_sync(peer_id, self.current_session_id)
+            if not success:
                 QMessageBox.warning(self, "错误", "会话初始化失败")
                 return
+            
+            # 确保session_id一致
+            if returned_session_id != self.current_session_id:
+                print(f"[UI] 警告: 服务器返回的session_id与本地不同，更新本地session_id")
+                self.current_session_id = returned_session_id
 
         try:
+            # 确保协议层使用正确的session_id
+            self.chat_client.protocol.session_id = self.current_session_id
+            self.chat_client.protocol.peer_id = peer_id
+            
             # 加密消息
             encrypted_message = self.chat_client.protocol.encrypt_message(content)
-            #从加密消息中重组消息
-
+            print(f"[UI] 当前会话ID: {self.current_session_id}")
+            print(f"[UI] 加密消息中的session_id: {encrypted_message.header.session_id}")
+            
+            #从加密消息中重组消息，使用当前会话的session_id
             decrypted_message =  Message(
                 message_id=encrypted_message.header.message_id,
                 sender_id=encrypted_message.header.sender_id,
-                session_id=encrypted_message.header.session_id,
+                session_id=self.current_session_id,  # 使用当前会话ID
                 receiver_id=encrypted_message.header.receiver_id,
                 encryption=encrypted_message.encryption,
                 message_type=MessageType.MESSAGE,
@@ -191,8 +257,8 @@ class ChatWindow(ChatWindowUI):
 
             # 发送消息到服务器
             if self.chat_client.send_message_sync(self.selected_contact.user_id, encrypted_message):
-
-                self.data_manager.add_message(session.session_id, decrypted_message)
+                print(f"[UI] 保存消息到会话: {self.current_session_id}")
+                self.data_manager.add_message(self.current_session_id, decrypted_message)
 
                 # 清空输入框
                 self.message_input.clear()
@@ -211,9 +277,11 @@ class ChatWindow(ChatWindowUI):
         try:
             # 解密消息
             decrypted_text = self.chat_client.protocol.decrypt_message(message)
-            # 获取或创建会话
-            session = self.data_manager.get_or_create_session(message.header.sender_id)
-
+            # 获取或创建会话 - 使用消息中的session_id
+            session = self.data_manager.get_or_create_session_with_id(
+                message.header.session_id,
+                message.header.sender_id
+            )
 
             # 创建新的消息对象（包含解密后的内容）
             message_obj = Message(
@@ -229,11 +297,22 @@ class ChatWindow(ChatWindowUI):
             # 保存消息
             self.data_manager.add_message(session.session_id, message_obj)
 
-            # 如果是当前会话，刷新消息列表
-            if session.session_id == self.current_session_id:
-                self.load_messages(session.session_id)
+            # 发送信号更新UI
+            self.message_received_signal.emit(session.session_id)
+            
         except Exception as e:
             print(f"处理消息失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def on_message_received(self, session_id: str):
+        """在主线程中更新UI"""
+        # 如果是当前会话，刷新消息列表
+        if session_id == self.current_session_id:
+            self.load_messages(session_id)
+        
+        # 刷新联系人列表以更新最后一条消息
+        self.load_contacts()
 
     def handle_file_upload(self):
         """处理文件上传"""
@@ -247,6 +326,71 @@ class ChatWindow(ChatWindowUI):
         if file_path:
             # TODO: 实现文件上传逻辑
             print(f"选择的文件: {file_path}")
+    
+    def on_friend_list_updated(self):
+        """当好友列表更新时调用（可能在非主线程）"""
+        print("好友列表已更新，发送信号刷新UI")
+        # 发射信号，在主线程中执行
+        self.friend_list_update_signal.emit()
+    
+    def show_contact_context_menu(self, position):
+        """显示联系人右键菜单"""
+        item = self.contact_list.itemAt(position)
+        if not item:
+            return
+        
+        friend_id = item.data(Qt.ItemDataRole.UserRole)
+        if not friend_id:
+            return
+        
+        # 创建右键菜单
+        menu = QMenu(self)
+        delete_action = menu.addAction("删除好友")
+        
+        # 显示菜单并获取选中的操作
+        action = menu.exec(self.contact_list.mapToGlobal(position))
+        
+        if action == delete_action:
+            self.delete_friend(friend_id)
+    
+    def delete_friend(self, friend_id: str):
+        """删除好友"""
+        # 获取好友信息
+        friend = self.data_manager.user.get_friend(friend_id)
+        if not friend:
+            return
+        
+        # 确认对话框
+        reply = QMessageBox.question(
+            self,
+            "确认删除",
+            f"确定要删除好友 {friend.username} 吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            # 从本地删除
+            if self.data_manager.user.remove_friend(friend_id):
+                self.data_manager.save_user_profile()
+                
+                # 通知服务器
+                if self.chat_client.remove_friend_sync(friend_id):
+                    print(f"已删除好友: {friend.username}")
+                
+                # 刷新联系人列表
+                self.load_contacts()
+                
+                # 如果当前正在和这个好友聊天，清空聊天区域
+                if self.selected_contact and self.selected_contact.user_id == friend_id:
+                    self.selected_contact = None
+                    self.current_session_id = None
+                    self.messages_area.clear()
+                    self.chat_header.setText("请选择联系人")
+                
+                QMessageBox.information(self, "成功", "好友已删除")
+            else:
+                QMessageBox.warning(self, "错误", "删除好友失败")
 
     def show_add_contact_dialog(self):
         """显示添加联系人对话框"""
@@ -287,6 +431,10 @@ class ChatWindow(ChatWindowUI):
 
         # 更新联系人列表
         self.data_manager.add_friend(new_friend)
+        
+        # 通知服务器，让对方也添加自己为好友
+        if self.chat_client.add_friend_sync(user_id):
+            print(f"已发送好友请求给 {user_name}")
         
         # 刷新联系人列表
         self.load_contacts()

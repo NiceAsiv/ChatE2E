@@ -293,23 +293,16 @@ class SignalProtocol:
         # 使用发送链棘轮生成消息密钥和新的发送链密钥
         message_key, self.sending_chain_key = \
             self.ratchet.sending_ratchet(self.sending_chain_key)
-            
-        print(f"[加密] 生成的消息密钥: {message_key.hex()}")
-        print(f"[加密] 新的发送链密钥: {self.sending_chain_key.hex()}")
 
         # 生成随机IV
         iv = self.crypto_helper.get_random_bytes(12)
         
         # 使用AES-GCM加密
         plaintext_bytes = plaintext.encode()
-        print(f"[加密] 明文bytes长度: {len(plaintext_bytes)}")
         
         ciphertext, tag = self.crypto_helper.encrypt_aes_gcm(message_key, 
                                                      plaintext_bytes, 
                                                      iv)
-        
-        print(f"[加密] 密文长度: {len(ciphertext)}")
-        print(f"[加密] 标签长度: {len(tag)}")
         
         # 创建加密参数，使用bytes类型
         encryption = Encryption(
@@ -345,10 +338,6 @@ class SignalProtocol:
 
         # 使用接收链棘轮派生消息密钥
         message_key, new_chain_key = self.ratchet.receiving_ratchet(current_key)
-        
-        print(f"[解密] 生成的消息密钥: {message_key.hex()}")
-        print(f"[解密] 旧的链密钥: {current_key.hex()}")
-        print(f"[解密] 新的链密钥: {new_chain_key.hex()}")
 
         try:
             # encryption对象中的iv/tag已经是bytes类型（在from_dict时已解码）
@@ -356,10 +345,6 @@ class SignalProtocol:
             tag = message.encryption.tag
             # encrypted_content 已经在 Message.from_dict 中被解码为 bytes
             ciphertext = message.encrypted_content
-            
-            print(f"[解密] IV类型: {type(iv)}, 长度: {len(iv) if isinstance(iv, bytes) else 'N/A'}")
-            print(f"[解密] Tag类型: {type(tag)}, 长度: {len(tag) if isinstance(tag, bytes) else 'N/A'}")
-            print(f"[解密] 密文长度: {len(ciphertext)}")
             
             # 解密消息
             plaintext = self.crypto_helper.decrypt_aes_gcm(
@@ -374,10 +359,6 @@ class SignalProtocol:
                 self.receiving_chain_key = new_chain_key
             else:
                 self.sending_chain_key = new_chain_key
-            
-            print(f"[解密] ✓ GCM解密成功")
-            print(f"[解密] 明文bytes长度: {len(plaintext)}")
-            print(f"[解密] 明文bytes前20字节: {plaintext[:20]}")
             
             decoded = plaintext.decode('utf-8')
             print(f"[解密] ✓ UTF-8解码成功: {decoded}")

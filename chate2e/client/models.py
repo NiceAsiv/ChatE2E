@@ -390,14 +390,24 @@ class DataManager:
         if session_id in self.sessions:
             self.sessions[session_id].add_message(message)
             self.save_data()
+            print(f"[DataManager] ✓ 消息已添加到会话 {session_id}，当前消息数: {len(self.sessions[session_id].messages)}")
         else:
-            print(f"会话 {session_id} 不存在！")
+            print(f"[DataManager] ✗ 会话 {session_id} 不存在！")
+            print(f"[DataManager] 现有会话: {list(self.sessions.keys())}")
     
     def add_friend(self, friend: Friend):
         """添加好友"""
         if self.user:
             if self.user.add_friend(friend):
                 self.save_data()
+    
+    def remove_friend(self, friend_id: str):
+        """删除好友"""
+        if self.user:
+            if self.user.remove_friend(friend_id):
+                self.save_data()
+                return True
+        return False
         
     def save_data(self):
         """保存所有数据"""
@@ -411,6 +421,11 @@ class DataManager:
                 [session.to_dict() for session in self.sessions.values()],
                 f, ensure_ascii=False, indent=2
             )
+    
+    def save_user_profile(self):
+        """仅保存用户配置"""
+        with open(self.user_file, 'w', encoding='utf-8') as f:
+            json.dump(self.user.to_dict(), f, ensure_ascii=False, indent=2)
 
     def get_or_create_session(self, user2_id: str) -> ChatSession:
         """获取或创建两个用户之间的会话"""
@@ -429,6 +444,36 @@ class DataManager:
         )
         self.sessions[session.session_id] = session
         self.save_data()
+        return session
+    
+    def get_or_create_session_with_id(self, session_id: str, user2_id: str) -> ChatSession:
+        """使用指定的session_id获取或创建会话"""
+        # 检查session_id是否已存在
+        if session_id in self.sessions:
+            return self.sessions[session_id]
+        
+        # 确保用户ID顺序一致
+        participant_ids = sorted([self.user.user_id, user2_id])
+        
+        # 检查是否已经存在这两个用户的会话
+        for session in self.sessions.values():
+            if sorted([session.participant1_id, session.participant2_id]) == participant_ids:
+                # 会话已存在，但session_id不同，这不应该发生
+                print(f"[Warning] 发现重复会话，使用新的session_id: {session_id}")
+                # 删除旧会话
+                old_id = session.session_id
+                del self.sessions[old_id]
+                break
+        
+        # 创建新会话，使用指定的session_id
+        session = ChatSession(
+            participant1_id=participant_ids[0],
+            participant2_id=participant_ids[1]
+        )
+        session.session_id = session_id
+        self.sessions[session_id] = session
+        self.save_data()
+        print(f"[DataManager] 创建新会话: {session_id}")
         return session
 
     def create_session_by_sender_session_id(self, session_id: str, user2_id: str) -> ChatSession:

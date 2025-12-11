@@ -6,8 +6,11 @@ from PyQt6.QtWidgets import (QWidget, QHBoxLayout,
                              QFileDialog)
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
+import os
 
-DEFAULT_AVATAR_PATH = "assets/avatars/default.png"
+# 获取客户端目录的绝对路径
+CLIENT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_AVATAR_PATH = os.path.join(CLIENT_DIR, "assets", "avatars", "default.png")
 
 
 class AvatarLabel(QLabel):
