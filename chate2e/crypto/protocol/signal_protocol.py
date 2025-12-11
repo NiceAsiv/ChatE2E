@@ -287,6 +287,9 @@ class SignalProtocol:
         if not self.session_initialized:
             raise Exception("Session not initialized")
 
+        print(f"[加密] 明文: {plaintext}")
+        print(f"[加密] 明文长度: {len(plaintext)}")
+
         # 使用发送链棘轮生成消息密钥和新的发送链密钥
         message_key, self.sending_chain_key = \
             self.ratchet.sending_ratchet(self.sending_chain_key)
@@ -298,19 +301,25 @@ class SignalProtocol:
         iv = self.crypto_helper.get_random_bytes(12)
         
         # 使用AES-GCM加密
+        plaintext_bytes = plaintext.encode()
+        print(f"[加密] 明文bytes长度: {len(plaintext_bytes)}")
+        
         ciphertext, tag = self.crypto_helper.encrypt_aes_gcm(message_key, 
-                                                     plaintext.encode(), 
+                                                     plaintext_bytes, 
                                                      iv)
         
-        # 创建加密参数，使用base64编码二进制数据
+        print(f"[加密] 密文长度: {len(ciphertext)}")
+        print(f"[加密] 标签长度: {len(tag)}")
+        
+        # 创建加密参数，使用bytes类型
         encryption = Encryption(
             algorithm="AES-GCM",
-            iv=base64.b64encode(iv).decode('utf-8'),
-            tag=base64.b64encode(tag).decode('utf-8'),
+            iv=iv,
+            tag=tag,
             is_initiator=self.is_initiator
         )
         
-        # 创建加密消息，使用base64编码密文
+        # 创建加密消息，使用bytes
         return Message(
             message_id=Message.generate_id(),
             sender_id=self.user_id,
@@ -318,7 +327,7 @@ class SignalProtocol:
             receiver_id=self.peer_id,
             encryption=encryption,
             message_type=MessageType.MESSAGE,
-            encrypted_content=base64.b64encode(ciphertext).decode('utf-8')
+            encrypted_content=ciphertext
         )
 
     def decrypt_message(self, message: Message) -> str:
@@ -338,13 +347,19 @@ class SignalProtocol:
         message_key, new_chain_key = self.ratchet.receiving_ratchet(current_key)
         
         print(f"[解密] 生成的消息密钥: {message_key.hex()}")
-        print(f"[解密] 新的接收链密钥: {new_chain_key.hex()}")
+        print(f"[解密] 旧的链密钥: {current_key.hex()}")
+        print(f"[解密] 新的链密钥: {new_chain_key.hex()}")
 
         try:
-            # 解码base64编码的数据
-            iv = base64.b64decode(message.encryption.iv)
-            tag = base64.b64decode(message.encryption.tag)
-            ciphertext = base64.b64decode(message.encrypted_content)
+            # encryption对象中的iv/tag已经是bytes类型（在from_dict时已解码）
+            iv = message.encryption.iv
+            tag = message.encryption.tag
+            # encrypted_content 已经在 Message.from_dict 中被解码为 bytes
+            ciphertext = message.encrypted_content
+            
+            print(f"[解密] IV类型: {type(iv)}, 长度: {len(iv) if isinstance(iv, bytes) else 'N/A'}")
+            print(f"[解密] Tag类型: {type(tag)}, 长度: {len(tag) if isinstance(tag, bytes) else 'N/A'}")
+            print(f"[解密] 密文长度: {len(ciphertext)}")
             
             # 解密消息
             plaintext = self.crypto_helper.decrypt_aes_gcm(
@@ -354,15 +369,24 @@ class SignalProtocol:
                 tag
             )
             
-            # 更新接收链密钥
+            # ✅ 只有解密成功才更新链密钥
             if use_receiving_key:
                 self.receiving_chain_key = new_chain_key
             else:
                 self.sending_chain_key = new_chain_key
-                
-            return plaintext.decode('utf-8')
+            
+            print(f"[解密] ✓ GCM解密成功")
+            print(f"[解密] 明文bytes长度: {len(plaintext)}")
+            print(f"[解密] 明文bytes前20字节: {plaintext[:20]}")
+            
+            decoded = plaintext.decode('utf-8')
+            print(f"[解密] ✓ UTF-8解码成功: {decoded}")
+            return decoded
             
         except Exception as e:
+            print(f"[解密] ✗ 解密失败，链密钥保持不变: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise Exception(f"Message decryption failed: {str(e)}")
         
         
