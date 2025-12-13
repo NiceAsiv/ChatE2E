@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                            QLabel, QLineEdit, QPushButton, QMessageBox)
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QPoint
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont, QIcon
+import qtawesome as qta
 
 class LoginUI(QWidget):
     login_clicked = pyqtSignal(str, str)
@@ -32,10 +33,11 @@ class LoginUI(QWidget):
         # 关闭按钮
         close_btn = QPushButton()
         close_btn.setFixedSize(30, 30)
-        #调整按钮图标大小
-        close_btn.setIconSize(QSize(20, 20))
-        close_btn.setIcon(QIcon("assets/icons/close.png"))
+        close_btn.setIcon(qta.icon('fa5s.times', color='#6B7280'))
+        close_btn.setIconSize(QSize(14, 14))
         close_btn.setObjectName("closeButton")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setToolTip("关闭")
         close_btn.clicked.connect(self.close)
         top_layout.addWidget(close_btn)
         
@@ -101,52 +103,63 @@ class LoginUI(QWidget):
         self.setStyleSheet("""
             QWidget {
                 background-color: #FFFFFF;
-                font-family: "Microsoft YaHei UI";
+                font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
             }
             #titleLabel {
-                color: #333333;
-                font-size: 18px;
-                font-weight: bold;
+                color: #111827;
+                font-size: 24px;
+                font-weight: 600;
+                margin-bottom: 10px;
             }
             #inputEdit {
-                border: 1px solid #CCCCCC;
-                border-radius: 20px;
-                padding: 0 15px;
+                border: 1px solid #E5E7EB;
+                border-radius: 8px;
+                padding: 0 16px;
                 font-size: 14px;
-                background-color: #F5F5F5;
+                background-color: #F9FAFB;
+                color: #1F2937;
+                selection-background-color: #2B5278;
             }
             #inputEdit:focus {
-                border-color: #2B5278;
+                border: 1px solid #2B5278;
                 background-color: #FFFFFF;
             }
             #loginButton {
                 background-color: #2B5278;
                 color: white;
                 border: none;
-                border-radius: 20px;
+                border-radius: 8px;
                 font-size: 14px;
-                font-weight: bold;
+                font-weight: 600;
             }
             #loginButton:hover {
-                background-color: #1A365D;
+                background-color: #1E3A5F;
+            }
+            #loginButton:pressed {
+                background-color: #172E4D;
             }
             #registerButton {
                 background-color: transparent;
                 color: #2B5278;
                 border: 1px solid #2B5278;
-                border-radius: 20px;
+                border-radius: 8px;
                 font-size: 14px;
-                font-weight: bold;
+                font-weight: 600;
             }
             #registerButton:hover {
-                background-color: #F0F0F0;
+                background-color: #F0F9FF;
             }
             #closeButton {
                 background-color: transparent;
                 border: none;
+                border-radius: 6px;
+                margin: 0;
             }
             #closeButton:hover {
-                background-color: #FF4444;
+                background-color: #FEE2E2;
+            }
+            #closeButton:pressed {
+                background-color: #FECACA;
             }
         """)
         

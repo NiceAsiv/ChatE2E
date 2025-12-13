@@ -2,6 +2,8 @@
 
 ChatE2E 是一个基于 Python 开发的端到端加密（End-to-End Encryption, E2EE）即时通讯应用。它实现了类 Signal 协议的安全通信机制，确保消息只能被发送者和接收者解密，服务器无法获取消息内容。
 
+<img src="./README.assets/image-20251213165601848.png" alt="image-20251213165601848" style="zoom: 50%;" />
+
 ## 核心技术与原理
 ```mermaid
 graph TB
@@ -109,32 +111,144 @@ graph TB
 ```bash
 python start_server.py
 ```
-*   服务器默认运行在 `http://localhost:5000`。
+*   务器默认运行在 `http://localhost:5000`。
 
 ### 2. 启动客户端
 你可以启动多个客户端实例来模拟不同的用户。
 
 **启动第一个客户端 (Alice):**
+
 ```bash
 python start_client.py
 ```
 
+<img src="./README.assets/image-20251213164755915.png" alt="image-20251213164755915" style="zoom:50%;" />
+
 **启动第二个客户端 (Bob):**
+
 ```bash
 python start_client2.py
 ```
 
 ### 3. 聊天流程
-1.  **注册/登录**: 在客户端登录界面输入用户名（例如 "Alice" 或 "Bob"）。如果是首次登录，系统会自动注册并生成加密密钥对。
-2.  **添加好友**:
-    *   在客户端 A 中点击"添加好友"。
-    *   输入客户端 B 的 **用户ID** (User UUID)。
-    *   *提示：用户ID可以在登录成功后的控制台日志中看到，或者在代码调试中获取。实际应用中通常通过用户名搜索，本项目简化为通过ID添加。*
-    *   (注：当前版本实现了自动同意好友请求逻辑)。
-3.  **发送消息**:
-    *   在左侧联系人列表中选择好友。
-    *   输入消息并发送。
-    *   观察控制台日志，可以看到密钥协商（X3DH）和消息加密/解密的过程。
+1. **注册/登录**: 在客户端登录界面输入用户名（例如 "Alice" 或 "Bob"）。如果是首次登录，系统会自动注册并生成加密密钥对。下面我们注册了
+   账号：test
+
+   密码：123456
+
+   ```json
+   {
+     "user_id": "e7be3149a1614170",
+     "username": "test",
+     "avatar_path": "assets/avatars\\default.png",
+     "status": "offline",
+     "last_seen": "2025-12-13T08:48:48.947842+00:00",
+     "password_hash": "jOW/DBLv9KzEOB9jiy74i6egbUGTIAPyV/dkx5IUc60=",
+     "salt": "faQh1etsHfWvuZO+iuPPsw==",
+     "bundle": {
+       "identity_key_pub": "G+mYjBFpIXI6wWxMGWN90OOJXOxLwDXAGMIJd3diSmk=",
+       "signed_pre_key_pub": "vj5UITryFzcV+4Om3MXS0gFJs852LMpEZrMd4rhu0Qo=",
+       "signed_pre_key_signature": "KgYZ7ue/nHQfIZuHrqL8dcS/7kv0gqeE+8aNpC3VNs4=",
+       "one_time_pre_keys_pub": [
+         "ZYIA8Sx38/DeIESENuL3tZwglYHVMgDO3Cv9DOdCp3U=",
+         "jiMqTO7VAKHN/D4uQvCidv4/BZVDcfsEkJWn8jVyQi8=",
+         "BNucY7d4LeC7PlhLvmS5obbq54dlphgJtMDN5hOlbws=",
+         "KzDr5L308u3WkKBX89yn3FlI1VnCCmT/tdNM+s6BEG0=",
+         "ZCEn1qqSYBo2eQmKijKdLqnd2K6X0yP4SRLEu22xJnY=",
+         "qaT9wzqJcLOGy+1TUKgnPGmEOe4zwh+2yXHQmJoDkw8=",
+         "cmN6CS3RHw1R+L0qaFTIQbbV/enLB7i6vieTBgEXagQ=",
+         "SShCloFXDmuAOfK0ecqN4FEe22zkJnBqIwbstoCmfE0=",
+         "W4gCafsvi3ZoSmEz6qHTTPKbbCtc5+h2VEcq0nmxb30=",
+         "nTMv+nkrfU76S9ym71MtGclWse0Ya9+fgLYqKNb6yS8="
+       ]
+     },
+     "localBundle": {
+       "identity_key_pair": {
+         "private_key": "wLzArjb/k98rK+8HGCeBehQujYpLICrJN/wdsmK4g1Q=",
+         "public_key": "G+mYjBFpIXI6wWxMGWN90OOJXOxLwDXAGMIJd3diSmk="
+       },
+       "signed_pre_key_pair": {
+         "private_key": "iPZ8OvbTNghtTGzp85RlMVFXXmb+ZPXm8t3oAHraUkM=",
+         "public_key": "vj5UITryFzcV+4Om3MXS0gFJs852LMpEZrMd4rhu0Qo="
+       },
+       "signed_pre_key_signature": "KgYZ7ue/nHQfIZuHrqL8dcS/7kv0gqeE+8aNpC3VNs4=",
+       "one_time_pre_key_pairs": [
+         {
+           "private_key": "0C3oMHwnnVL7eXEQ9cUp/5LhMy74Nnpy7fz15JbtNWs=",
+           "public_key": "ZYIA8Sx38/DeIESENuL3tZwglYHVMgDO3Cv9DOdCp3U="
+         },
+         {
+           "private_key": "kCX7IKTKteUpAmLiZ5WWh2RCXa1SW7AOGjDhQZg5n10=",
+           "public_key": "ZCEn1qqSYBo2eQmKijKdLqnd2K6X0yP4SRLEu22xJnY="
+         },
+         {
+           "private_key": "wB0RAdNl2SBqKmgpJnvAnII03k953nZNBY18zpjQiE0=",
+           "public_key": "KzDr5L308u3WkKBX89yn3FlI1VnCCmT/tdNM+s6BEG0="
+         },
+         {
+           "private_key": "UHW/CapBgjhVm9EOYkxUvjw8GksEQfPxdrR5QZcTS1Q=",
+           "public_key": "cmN6CS3RHw1R+L0qaFTIQbbV/enLB7i6vieTBgEXagQ="
+         },
+         {
+           "private_key": "kJctVVsMO3+kRwN8+JMnKn6tGeiC1BkFUJV13tiO0HE=",
+           "public_key": "BNucY7d4LeC7PlhLvmS5obbq54dlphgJtMDN5hOlbws="
+         },
+         {
+           "private_key": "yHH0m6DNkm3ReoYlGDN8g2UO0wVBmu299ISTXhxOh00=",
+           "public_key": "qaT9wzqJcLOGy+1TUKgnPGmEOe4zwh+2yXHQmJoDkw8="
+         },
+         {
+           "private_key": "4DVKNEdO9s6IQtE5Pam6pDzQahZVNAcC1hyWAgDOu1c=",
+           "public_key": "W4gCafsvi3ZoSmEz6qHTTPKbbCtc5+h2VEcq0nmxb30="
+         },
+         {
+           "private_key": "8N9wx8Ny4C+NrCFMwTBLKiN6aCcv3d20Xnx1fTnXyHI=",
+           "public_key": "nTMv+nkrfU76S9ym71MtGclWse0Ya9+fgLYqKNb6yS8="
+         },
+         {
+           "private_key": "6MXQwuem3t9cx+LD5rFUZQG9S5g4wWA3ThWN1o6/WFE=",
+           "public_key": "jiMqTO7VAKHN/D4uQvCidv4/BZVDcfsEkJWn8jVyQi8="
+         },
+         {
+           "private_key": "sHJmmTQG/OMsBT7qzULhrQKSyECzvVXl+FSeGTlJYEo=",
+           "public_key": "SShCloFXDmuAOfK0ecqN4FEe22zkJnBqIwbstoCmfE0="
+         }
+       ]
+     },
+     "friends": []
+   }
+   ```
+
+2. **添加好友**:
+
+   * 在客户端 A 中点击"添加好友"。
+
+     <img src="./README.assets/image-20251213165222269.png" alt="image-20251213165222269" style="zoom: 50%;" />
+
+   * 输入客户端 B 的 **用户ID** (User UUID)。
+
+   * *提示：用户ID可以在登录成功后的控制台日志中看到，或者在代码调试中获取。实际应用中通常通过用户名搜索，本项目简化为通过ID添加。*
+
+   *   (注：当前版本实现了自动同意好友请求逻辑)。
+
+3. **发送消息**:
+   * 在左侧联系人列表中选择好友。
+
+     <img src="./README.assets/image-20251213165651262.png" alt="image-20251213165651262" style="zoom:50%;" />
+
+     发送的消息：
+
+     <img src="./README.assets/image-20251213165712915.png" alt="image-20251213165712915" style="zoom: 50%;" />
+
+     接收的消息
+
+     <img src="./README.assets/image-20251213165814892.png" alt="image-20251213165814892" style="zoom: 67%;" />
+
+     
+
+   * 输入消息并发送。
+
+   *   观察控制台日志，可以看到密钥协商（X3DH）和消息加密/解密的过程。
 
 ## 项目结构
 
