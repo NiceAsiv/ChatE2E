@@ -1,4 +1,4 @@
-# ChatE2E - 端到端加密聊天应用
+# ChatE2E - 基于Signal协议的端到端加密聊天应用
 
 ChatE2E 是一个基于 Python 开发的端到端加密（End-to-End Encryption, E2EE）即时通讯应用。它实现了类 Signal 协议的安全通信机制，确保消息只能被发送者和接收者解密，服务器无法获取消息内容。
 
