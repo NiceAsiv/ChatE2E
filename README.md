@@ -1,95 +1,97 @@
-# ChatE2E - 基于Signal协议的端到端加密聊天应用
+# ChatE2E - End-to-End Encrypted Chat Application Based on Signal Protocol
 
-ChatE2E 是一个基于 Python 开发的端到端加密（End-to-End Encryption, E2EE）即时通讯应用。它实现了类 Signal 协议的安全通信机制，确保消息只能被发送者和接收者解密，服务器无法获取消息内容。
+[中文版](./README-zh.md) | English
+
+ChatE2E is an end-to-end encrypted (E2EE) instant messaging application developed with Python. It implements a Signal Protocol-like secure communication mechanism, ensuring that messages can only be decrypted by the sender and receiver, with the server unable to access message content.
 
 <img src="./README.assets/image-20251213165601848.png" alt="image-20251213165601848" style="zoom: 50%;" />
 
-## 核心技术与原理
+## Core Technologies and Principles
 ```mermaid
 graph TB
-    subgraph "密钥初始化"
-        A1["Alice生成密钥对"] -->|生成| A2["身份密钥对"]
-        A1 -->|生成| A3["预签名密钥对"]
-        A1 -->|生成| A4["一次性预密钥对"]
+    subgraph "Key Initialization"
+        A1["Alice Generates Key Pairs"] -->|Generate| A2["Identity Key Pair"]
+        A1 -->|Generate| A3["Signed PreKey Pair"]
+        A1 -->|Generate| A4["One-Time PreKey Pairs"]
         
-        B1["Bob生成密钥对"] -->|生成| B2["身份密钥对"]
-        B1 -->|生成| B3["预签名密钥对"]
-        B1 -->|生成| B4["一次性预密钥对"]
+        B1["Bob Generates Key Pairs"] -->|Generate| B2["Identity Key Pair"]
+        B1 -->|Generate| B3["Signed PreKey Pair"]
+        B1 -->|Generate| B4["One-Time PreKey Pairs"]
     end
 
-    subgraph "X3DH密钥协商"
-        I1["Alice(发起方)计算DH"] -->|DH1| I2["IKa × SPKb"]
+    subgraph "X3DH Key Agreement"
+        I1["Alice (Initiator) Calculates DH"] -->|DH1| I2["IKa × SPKb"]
         I1 -->|DH2| I3["EKa × IKb"]
         I1 -->|DH3| I4["EKa × SPKb"]
         I1 -->|DH4| I5["EKa × OPKb"]
         
-        I2 & I3 & I4 & I5 -->|组合| SK1["共享密钥SK"]
+        I2 & I3 & I4 & I5 -->|Combine| SK1["Shared Key SK"]
         
-        SK1 -->|HKDF| RK1["根密钥(Root Key)"]
-        RK1 -->|派生| CK1["发送链密钥"]
-        RK1 -->|派生| CK2["接收链密钥"]
+        SK1 -->|HKDF| RK1["Root Key"]
+        RK1 -->|Derive| CK1["Sending Chain Key"]
+        RK1 -->|Derive| CK2["Receiving Chain Key"]
     end
 
-    subgraph "消息加密流程"
-        M1["发送方"] -->|"1. 使用发送链密钥"| M2["派生消息密钥"]
-        M2 -->|"2. HKDF派生"| M3["新的发送链密钥"]
-        M2 -->|"3. AESGCM加密"| M4["加密消息"]
-        M4 -->|"4. 添加头信息"| M5["最终密文"]
+    subgraph "Message Encryption Process"
+        M1["Sender"] -->|"1. Use Sending Chain Key"| M2["Derive Message Key"]
+        M2 -->|"2. HKDF Derivation"| M3["New Sending Chain Key"]
+        M2 -->|"3. AESGCM Encryption"| M4["Encrypted Message"]
+        M4 -->|"4. Add Header Info"| M5["Final Ciphertext"]
     end
 
-    subgraph "消息解密流程"
-        D1["接收方"] -->|"1. 验证消息来源"| D2["选择正确链密钥"]
-        D2 -->|"2. HKDF派生"| D3["消息密钥"]
-        D3 -->|"3. AESGCM解密"| D4["解密消息"]
-        D2 -->|"4. 更新"| D5["新的接收链密钥"]
+    subgraph "Message Decryption Process"
+        D1["Receiver"] -->|"1. Verify Message Source"| D2["Select Correct Chain Key"]
+        D2 -->|"2. HKDF Derivation"| D3["Message Key"]
+        D3 -->|"3. AESGCM Decryption"| D4["Decrypted Message"]
+        D2 -->|"4. Update"| D5["New Receiving Chain Key"]
     end
 
     A4 --> I1
     B4 --> I1
     M5 --> D1
 ```
-本项目主要包含以下核心技术组件：
+This project includes the following core technical components:
 
-### 1. 端到端加密 (Signal Protocol 实现)
-核心安全机制基于 Signal Protocol 的变体，实现了前向安全（Forward Secrecy）和后向安全（Post-Compromise Security）。
-*   **X3DH (Extended Triple Diffie-Hellman)**: 用于初始密钥协商。当两个用户首次建立会话时，通过服务器交换预密钥（Identity Key, Signed PreKey, One-Time PreKey）来协商出共享密钥，确保异步通信的安全性。
-*   **Double Ratchet Algorithm (双棘轮算法)**: 用于会话过程中的密钥更新。
-    *   **Diffie-Hellman 棘轮**: 随着消息交换不断更新共享密钥，提供前向安全。
-    *   **KDF 链 (哈希) 棘轮**: 为每条消息生成独立的加密密钥。
-*   **加密原语**:
-    *   **X25519**: 椭圆曲线 Diffie-Hellman 密钥交换。
-    *   **AES-GCM**: 关联数据的认证加密。
-    *   **HMAC-SHA256 / HKDF**: 密钥派生函数。
+### 1. End-to-End Encryption (Signal Protocol Implementation)
+The core security mechanism is based on a variant of the Signal Protocol, implementing Forward Secrecy and Post-Compromise Security.
+*   **X3DH (Extended Triple Diffie-Hellman)**: Used for initial key agreement. When two users first establish a session, they exchange pre-keys (Identity Key, Signed PreKey, One-Time PreKey) through the server to negotiate a shared key, ensuring asynchronous communication security.
+*   **Double Ratchet Algorithm**: Used for key updates during sessions.
+    *   **Diffie-Hellman Ratchet**: Continuously updates the shared key with message exchanges, providing forward secrecy.
+    *   **KDF Chain (Hash) Ratchet**: Generates independent encryption keys for each message.
+*   **Cryptographic Primitives**:
+    *   **X25519**: Elliptic curve Diffie-Hellman key exchange.
+    *   **AES-GCM**: Authenticated encryption with associated data.
+    *   **HMAC-SHA256 / HKDF**: Key derivation functions.
 
-### 2. 通信架构
-*   **Client-Server 模型**: 服务器仅作为消息中转站（Relay）和密钥存储中心（Key Store）。
-*   **WebSocket (Socket.IO)**: 用于实时的消息推送、好友状态更新和信令交换。
-*   **REST API (Flask)**: 用于用户注册、密钥包（Bundle）上传与获取、离线消息拉取等。
+### 2. Communication Architecture
+*   **Client-Server Model**: The server only serves as a message relay and key storage center.
+*   **WebSocket (Socket.IO)**: Used for real-time message push, friend status updates, and signaling exchange.
+*   **REST API (Flask)**: Used for user registration, bundle upload and retrieval, offline message pulling, etc.
 
-### 3. 客户端界面
-*   **PyQt6**: 使用 Python 的 Qt 绑定库构建跨平台桌面 GUI。
-*   **本地存储**: 用户密钥、会话状态和聊天记录加密存储在本地 JSON 文件中。
+### 3. Client Interface
+*   **PyQt6**: Cross-platform desktop GUI built using Python's Qt binding library.
+*   **Local Storage**: User keys, session states, and chat history are encrypted and stored in local JSON files.
 
-## 环境安装
+## Installation
 
-### 前置要求
-*   Python 3.8 或更高版本
+### Prerequisites
+*   Python 3.8 or higher
 
-### 安装步骤
+### Installation Steps
 
-1.  克隆仓库：
+1.  Clone the repository:
     ```bash
     git clone https://github.com/NiceAsiv/ChatE2E.git
     cd ChatE2E
     ```
 
-2.  创建并激活虚拟环境（推荐）：
+2.  Create and activate a virtual environment (recommended):
     ```bash
-    # 使用 Conda
+    # Using Conda
     conda env create -f conda_env.yaml
     conda activate chat_e2e_env
     
-    # 或者使用 venv
+    # Or using venv
     python -m venv venv
     # Windows
     .\venv\Scripts\activate
@@ -97,26 +99,26 @@ graph TB
     source venv/bin/activate
     ```
 
-3.  安装依赖：
+3.  Install dependencies:
     ```bash
     pip install -r requirements.txt
     ```
 
-## 使用指南
+## Usage Guide
 
-本项目包含服务器端和客户端启动脚本，支持在同一台机器上模拟多用户通信。
+This project includes server-side and client-side startup scripts, supporting multi-user communication simulation on the same machine.
 
-### 1. 启动服务器
-首先启动中央服务器，用于处理信令交换和消息转发。
+### 1. Start the Server
+First, start the central server to handle signaling exchange and message forwarding.
 ```bash
 python start_server.py
 ```
-*   务器默认运行在 `http://localhost:5000`。
+*   The server runs by default on `http://localhost:5000`.
 
-### 2. 启动客户端
-你可以启动多个客户端实例来模拟不同的用户。
+### 2. Start the Client
+You can start multiple client instances to simulate different users.
 
-**启动第一个客户端 (Alice):**
+**Start the first client (Alice):**
 
 ```bash
 python start_client.py
@@ -124,17 +126,18 @@ python start_client.py
 
 <img src="./README.assets/image-20251213164755915.png" alt="image-20251213164755915" style="zoom:50%;" />
 
-**启动第二个客户端 (Bob):**
+**Start the second client (Bob):**
 
 ```bash
 python start_client2.py
 ```
 
-### 3. 聊天流程
-1. **注册/登录**: 在客户端登录界面输入用户名（例如 "Alice" 或 "Bob"）。如果是首次登录，系统会自动注册并生成加密密钥对。下面我们注册了
-   账号：test
+### 3. Chat Flow
+1. **Register/Login**: Enter a username (e.g., "Alice" or "Bob") in the client login interface. If it's the first login, the system will automatically register and generate encryption key pairs. Below is an example of a registered account:
+   
+   Username: test
 
-   密码：123456
+   Password: 123456
 
    ```json
    {
@@ -219,48 +222,48 @@ python start_client2.py
    }
    ```
 
-2. **添加好友**:
+2. **Add Friends**:
 
-   * 在客户端 A 中点击"添加好友"。
+   * Click "Add Friend" in Client A.
 
      <img src="./README.assets/image-20251213165222269.png" alt="image-20251213165222269" style="zoom: 50%;" />
 
-   * 输入客户端 B 的 **用户ID** (User UUID)。
+   * Enter the **User ID** (User UUID) of Client B.
 
-   * *提示：用户ID可以在登录成功后的控制台日志中看到，或者在代码调试中获取。实际应用中通常通过用户名搜索，本项目简化为通过ID添加。*
+   * *Note: The user ID can be seen in the console log after successful login or obtained during code debugging. In real applications, users are typically searched by username; this project simplifies it by adding via ID.*
 
-   *   (注：当前版本实现了自动同意好友请求逻辑)。
+   *   (Note: The current version implements automatic friend request acceptance logic).
 
-3. **发送消息**:
-   * 在左侧联系人列表中选择好友。
+3. **Send Messages**:
+   * Select a friend from the contact list on the left.
 
      <img src="./README.assets/image-20251213165651262.png" alt="image-20251213165651262" style="zoom:50%;" />
 
-     发送的消息：
+     Sent message:
 
      <img src="./README.assets/image-20251213165712915.png" alt="image-20251213165712915" style="zoom: 50%;" />
 
-     接收的消息
+     Received message:
 
      <img src="./README.assets/image-20251213165814892.png" alt="image-20251213165814892" style="zoom: 67%;" />
 
      
 
-   * 输入消息并发送。
+   * Type a message and send it.
 
-   *   观察控制台日志，可以看到密钥协商（X3DH）和消息加密/解密的过程。
+   *   Observe the console logs to see the key agreement (X3DH) and message encryption/decryption process.
 
-## 项目结构
+## Project Structure
 
-*   `chate2e/`: 核心源码包
-    *   `client/`: 客户端逻辑 (UI, 网络通信, 业务逻辑)
-    *   `server/`: 服务器逻辑 (Flask App, SocketIO 处理)
-    *   `crypto/`: 加密模块 (Signal 协议实现, 密码学原语封装)
-    *   `model/`: 数据模型 (消息, 用户, 密钥包)
-*   `chat_data/`: 客户端本地数据存储目录 (自动生成)
-*   `start_server.py`: 服务器启动脚本
-*   `start_client.py`: 客户端启动脚本
+*   `chate2e/`: Core source package
+    *   `client/`: Client logic (UI, network communication, business logic)
+    *   `server/`: Server logic (Flask App, SocketIO handling)
+    *   `crypto/`: Encryption module (Signal protocol implementation, cryptographic primitives wrapper)
+    *   `model/`: Data models (messages, users, key bundles)
+*   `chat_data/`: Client local data storage directory (auto-generated)
+*   `start_server.py`: Server startup script
+*   `start_client.py`: Client startup script
 
-## 许可证
+## License
 
 MIT License
