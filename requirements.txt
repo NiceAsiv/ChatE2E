@@ -65,7 +65,7 @@ simple-websocket==1.1.0
 tomli @ file:///C:/Windows/TEMP/abs_ac109f85-a7b3-4b4d-bcfd-52622eceddf0hy332ojo/croots/recipe/tomli_1657175513137/work
 tomlkit==0.13.2
 typing_extensions==4.9.0
-urllib3==2.2.3
+urllib3==2.6.0
 websocket-client==1.8.0
 websockets==10.4
 Werkzeug==3.0.6
