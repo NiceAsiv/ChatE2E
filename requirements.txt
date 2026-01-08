@@ -21,7 +21,7 @@ Flask==3.0.3
 Flask-Cors==5.0.0
 Flask-SocketIO==5.5.1
 frozenlist==1.5.0
-h11==0.14.0
+h11==0.16.0
 idna==3.10
 importlib_metadata==8.5.0
 iniconfig @ file:///home/linux1/recipes/ci/iniconfig_1610983019677/work
