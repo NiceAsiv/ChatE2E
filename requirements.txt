@@ -54,7 +54,7 @@ pytest-asyncio==0.24.0
 pytest-cov==5.0.0
 python-dotenv==1.0.1
 python-engineio==4.11.2
-python-socketio==5.12.1
+python-socketio==5.14.0
 qasync==0.27.1
 qt6-applications==6.4.3.2.3
 qt6-tools==6.4.3.1.3
