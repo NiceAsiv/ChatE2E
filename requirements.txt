@@ -18,7 +18,7 @@ dill==0.3.9
 exceptiongroup @ file:///C:/b/abs_c5h1o1_b5b/croot/exceptiongroup_1706031441653/work
 flake8==7.1.1
 Flask==3.0.3
-Flask-Cors==5.0.0
+Flask-Cors==6.0.0
 Flask-SocketIO==5.5.1
 frozenlist==1.5.0
 h11==0.16.0
